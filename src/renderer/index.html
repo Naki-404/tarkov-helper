@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'">
+  <title>Tarkov Helper</title>
+  <link rel="stylesheet" href="../../node_modules/leaflet/dist/leaflet.css">
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <!-- ============ Командная строка ============ -->
+  <header class="bar">
+    <div class="brand"><span class="glyph" aria-hidden="true"></span><span class="wordmark">TARKOV<b>HELPER</b></span></div>
+
+    <nav class="ws" id="ws" aria-label="Разделы">
+      <button data-view="raid" class="on" title="Карта и задачи на рейд (Ctrl+1)"><i class="ic ic-raid"></i><span>Рейд</span></button>
+      <button data-view="dossier" title="Все квесты (Ctrl+2)"><i class="ic ic-dossier"></i><span>Досье</span><em id="wsQuestBadge"></em></button>
+      <button data-view="base" title="Модули убежища (Ctrl+3)"><i class="ic ic-base"></i><span>Убежище</span></button>
+      <button data-view="stash" title="Что собрать (Ctrl+4)"><i class="ic ic-stash"></i><span>Склад</span></button>
+      <button data-view="summary" title="Прогресс и журнал (Ctrl+5)"><i class="ic ic-summary"></i><span>Сводка</span></button>
+    </nav>
+
+    <button class="omni" id="omniBtn" title="Поиск по квестам, предметам, картам и модулям"><i class="ic ic-search"></i><span>Найти…</span><kbd>Ctrl K</kbd></button>
+
+    <div class="telemetry" id="telemetry" title="Состояние по логам игры">
+      <span class="led" id="led"></span>
+      <span class="tl-main" id="tlMain">Запуск…</span>
+      <span class="tl-sub" id="tlSub"></span>
+    </div>
+
+    <div class="drag"></div>
+    <div class="click-banner hidden" id="clickBanner">клики проходят в игру</div>
+    <div class="tools">
+      <button class="tool" id="btnCompact" title="Компактная панель задач поверх игры"><i class="ic ic-compact"></i></button>
+      <button class="tool" id="btnClick" title="Сквозь окно — клики проходят в игру"><i class="ic ic-click"></i></button>
+      <button class="tool" id="btnPin" title="Поверх всех окон"><i class="ic ic-pin"></i></button>
+      <button class="tool" id="btnSettings" title="Настройки"><i class="ic ic-gear"></i></button>
+      <button class="tool" id="btnHelp" title="Как пользоваться"><i class="ic ic-help"></i></button>
+      <span class="sep"></span>
+      <button class="win" id="btnMin" title="Свернуть"><svg viewBox="0 0 10 10"><path d="M1,5 L9,5"/></svg></button>
+      <button class="win" id="btnMax" title="Развернуть"><svg viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7"/></svg></button>
+      <button class="win close" id="btnClose" title="Скрыть в трей"><svg viewBox="0 0 10 10"><path d="M1.5,1.5 L8.5,8.5 M8.5,1.5 L1.5,8.5"/></svg></button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ============ РЕЙД: карта на весь экран + плавающие панели ============ -->
+    <section class="view on" id="view-raid">
+      <div id="map"></div>
+      <div class="map-empty hidden" id="mapEmpty"></div>
+
+      <div class="hud hud-maps" id="mapStrip" aria-label="Карты"></div>
+
+      <div class="hud hud-layers">
+        <label class="follow" title="Переключать карту, когда игра её загружает"><input type="checkbox" id="mapFollow" checked><span>следовать за игрой</span></label>
+        <div class="chips" id="layerChips">
+          <button data-layer="quests" class="chip on" title="Точки активных квестов">Задачи</button>
+          <button data-layer="avail" class="chip" title="Точки квестов, которые можно взять">Можно взять</button>
+          <button data-layer="pmc" class="chip on">Выходы ЧВК</button>
+          <button data-layer="scav" class="chip">Выходы Диких</button>
+          <button data-layer="transits" class="chip on">Переходы</button>
+          <button data-layer="locks" class="chip" title="Все запертые двери">Двери</button>
+          <button data-layer="labels" class="chip on">Подписи</button>
+        </div>
+      </div>
+
+      <aside class="dock dock-left" id="dockLeft">
+        <div class="dock-head">
+          <div class="dock-title"><b id="briefMap">—</b><span id="briefInfo"></span></div>
+          <button class="dock-fold" data-fold="dockLeft" title="Свернуть брифинг">‹</button>
+        </div>
+        <div class="tabs" id="briefTabs">
+          <button data-brief="bring" class="on">Взять <em id="bringCount"></em></button>
+          <button data-brief="exits">Выходы</button>
+        </div>
+        <div class="dock-body" id="briefBody"></div>
+      </aside>
+      <button class="dock-tab left hidden" data-unfold="dockLeft">Брифинг</button>
+
+      <aside class="dock dock-right" id="dockRight">
+        <div class="dock-head">
+          <div class="dock-title"><b>Задачи</b><span id="taskInfo"></span></div>
+          <select id="compactMap" class="field compact-only" title="Карта"></select>
+          <button class="dock-fold" data-fold="dockRight" title="Свернуть задачи">›</button>
+        </div>
+        <div class="dock-body" id="taskBody"></div>
+      </aside>
+      <button class="dock-tab right hidden" data-unfold="dockRight">Задачи</button>
+
+      <div class="hud hud-bottom">
+        <div class="seg" id="styleSeg"><button data-style="svg" class="on">Схема</button><button data-style="tile">Спутник</button></div>
+        <div class="seg" id="floorSeg"></div>
+        <button class="hbtn" id="btnFit" title="Вся карта"><i class="ic ic-fit"></i></button>
+        <button class="hbtn" id="btnMe" title="Моя позиция (по скриншоту)"><i class="ic ic-me"></i></button>
+      </div>
+      <div class="map-credit" id="mapCredit"></div>
+    </section>
+
+    <!-- ============ ДОСЬЕ: фильтры | список | карточка ============ -->
+    <section class="view" id="view-dossier">
+      <div class="dossier">
+        <aside class="filters">
+          <input id="qSearch" class="field" type="search" placeholder="Квест, предмет, торговец…">
+          <div class="flist" id="qStatusList"></div>
+          <div class="fgroup">
+            <div class="flabel">Торговец</div>
+            <div class="flist" id="qTraderList"></div>
+          </div>
+          <div class="fgroup">
+            <div class="flabel">Карта</div>
+            <select id="qMap" class="field"></select>
+          </div>
+          <div class="fgroup">
+            <label class="switch"><input type="checkbox" id="qKappa"><span></span>Только Каппа</label>
+            <label class="switch"><input type="checkbox" id="qLk"><span></span>Только Смотритель</label>
+          </div>
+        </aside>
+        <div class="qlist-wrap">
+          <div class="qlist-head"><b id="qListTitle">Активные</b><span id="qListCount"></span>
+            <select id="qSort" class="field sm"><option value="trader">по торговцу</option><option value="level">по уровню</option><option value="map">по карте</option><option value="progress">по прогрессу</option></select></div>
+          <div class="qlist" id="qList"></div>
+        </div>
+        <article class="detail" id="qDetail"></article>
+      </div>
+    </section>
+
+    <!-- ============ УБЕЖИЩЕ ============ -->
+    <section class="view" id="view-base">
+      <div class="base">
+        <div class="base-grid-wrap">
+          <div class="view-head"><h1>Убежище</h1><p>Нажми на деления под модулем, чтобы отметить построенный уровень — игра его в логи не пишет.</p>
+            <div class="legend"><span><i class="lg ready"></i>можно строить</span><span><i class="lg open"></i>собирать предметы</span><span><i class="lg blocked"></i>нужен другой модуль</span><span><i class="lg max"></i>максимум</span></div></div>
+          <div class="tiles" id="baseTiles"></div>
+        </div>
+        <article class="detail" id="baseDetail"></article>
+      </div>
+    </section>
+
+    <!-- ============ СКЛАД ============ -->
+    <section class="view" id="view-stash">
+      <div class="view-head row">
+        <div><h1>Склад</h1><p id="stashCaption"></p></div>
+        <input id="iSearch" class="field" type="search" placeholder="Поиск предмета…">
+      </div>
+      <div class="toolbar">
+        <div class="seg" id="iQuestSeg"><button data-iq="active" class="on">Квесты: активные</button><button data-iq="open">все невыполненные</button><button data-iq="none">без квестов</button></div>
+        <div class="seg" id="iHideSeg"><button data-ih="next" class="on">Убежище: следующий уровень</button><button data-ih="all">все уровни</button><button data-ih="none">без убежища</button></div>
+        <label class="switch"><input type="checkbox" id="iFir"><span></span>Только FiR</label>
+        <label class="switch"><input type="checkbox" id="iHideDone" checked><span></span>Скрыть собранное</label>
+      </div>
+      <div class="stash-summary" id="stashSummary"></div>
+      <div class="table" id="stashTable"></div>
+    </section>
+
+    <!-- ============ СВОДКА ============ -->
+    <section class="view" id="view-summary">
+      <div class="view-head"><h1>Сводка</h1><p>Прогресс собирается из логов игры. Уровень, убежище и счётчики «2 из 5» — вручную.</p></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="sum-grid">
+        <div class="panel">
+          <div class="panel-title">Персонаж</div>
+          <div class="kv"><span>Профиль</span><b id="pProfile">—</b></div>
+          <div class="kv"><span>Режим · фракция</span><b id="pMode">—</b></div>
+          <div class="kv"><span>Уровень</span><span class="kv-r"><input id="pLevel" class="field num" type="number" min="1" max="79" placeholder="авто"><button class="btn sm" id="pLevelAuto" title="Считать по квестам">авто</button></span></div>
+          <div class="kv"><span>Оценка по квестам</span><b id="pEstLevel">—</b></div>
+          <div class="panel-title mt">Вайп</div>
+          <div class="kv"><span>Прогресс считается с</span><b id="pWipe">—</b></div>
+          <p class="note">Вайп в логах не помечается. Приложение находит его само — когда уже выполненные квесты снова приходят как «взят».</p>
+          <div class="btnrow">
+            <button class="btn" id="btnWipeNow">Я только что вайпнулся</button>
+            <button class="btn hidden" id="btnWipeIgnore">Это был не вайп</button>
+            <button class="btn hidden" id="btnWipeAuto">Определять автоматически</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Торговцы</div>
+          <div class="traders" id="pTraders"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Данные</div>
+          <div class="kv"><span>Событий квестов</span><b id="pLogCount">—</b></div>
+          <div class="kv"><span>Не распознано (ежедневные / новые)</span><b id="pUnresolved">—</b></div>
+          <div class="kv"><span>База tarkov.dev</span><b id="pData">—</b></div>
+          <div class="btnrow">
+            <button class="btn" id="btnRescan">Пересканировать логи</button>
+            <button class="btn" id="btnRefresh">Обновить базу</button>
+            <button class="btn danger" id="btnReset" title="Убежище и собранные предметы не трогаются">Сбросить квесты</button>
+          </div>
+        </div>
+        <div class="panel span2">
+          <div class="panel-title">Журнал игры <span class="note inline">— всё, что приложение прочитало из логов</span></div>
+          <div class="journal" id="journal"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ Настройки (выдвижная панель) ============ -->
+  <div class="drawer hidden" id="settings">
+    <div class="drawer-box">
+      <div class="drawer-head"><h2>Настройки</h2><button class="win close" id="settingsClose" title="Закрыть"><svg viewBox="0 0 10 10"><path d="M1.5,1.5 L8.5,8.5 M8.5,1.5 L1.5,8.5"/></svg></button></div>
+      <div class="drawer-body">
+        <div class="panel-title">Логи игры</div>
+        <div class="path" id="sLogsDir">—</div>
+        <div class="note" id="sLogsStatus"></div>
+        <div class="btnrow"><button class="btn" id="sLogsBrowse">Выбрать папку…</button><button class="btn" id="sLogsAuto">Найти автоматически</button></div>
+
+        <div class="panel-title mt">Окно</div>
+        <div class="kv"><span>Прозрачность</span><span class="range"><input type="range" id="sOpacity" min="0.35" max="1" step="0.01"><b id="sOpacityVal"></b></span></div>
+        <div class="kv"><span>Масштаб интерфейса</span><span class="range"><input type="range" id="sScale" min="0.8" max="1.5" step="0.05"><b id="sScaleVal"></b></span></div>
+        <label class="switch"><input type="checkbox" id="sTop"><span></span>Поверх всех окон</label>
+        <label class="switch"><input type="checkbox" id="sNotify"><span></span>Уведомления Windows о квестах, когда окно скрыто</label>
+        <label class="switch"><input type="checkbox" id="sLite"><span></span>Экономный режим — без видеокарты, меньше памяти</label>
+        <p class="note">Включён по умолчанию: приложение не занимает видеокарту (она вся у игры) и держит ~3 процесса. Скрытое окно выгружает карту из памяти. Смена режима — после перезапуска.</p>
+        <div class="btnrow hidden" id="sLiteRestart"><button class="btn accent" id="sRelaunch">Перезапустить сейчас</button></div>
+
+        <div class="panel-title mt">Горячие клавиши</div>
+        <div class="kv"><span>Показать / скрыть</span><input id="hkToggle" class="field hk"></div>
+        <div class="kv"><span>Сквозь окно</span><input id="hkClick" class="field hk"></div>
+        <div class="kv"><span>Компактная панель</span><input id="hkCompact" class="field hk"></div>
+        <div class="kv"><span>Открыть карту</span><input id="hkMap" class="field hk"></div>
+        <div class="kv"><span>Открыть досье</span><input id="hkQuests" class="field hk"></div>
+        <p class="note">Кликни в поле и нажми сочетание. Клавиши регистрируются в Windows и в игру не передаются.</p>
+        <div class="btnrow"><button class="btn accent" id="sHkSave">Применить клавиши</button></div>
+
+        <div class="panel-title mt">Позиция по скриншотам</div>
+        <label class="switch"><input type="checkbox" id="sShots"><span></span>Показывать «Я» на карте</label>
+        <p class="note">Игра пишет координаты в имя файла скриншота. Читаются только имена новых файлов. Скриншот — игровой клавишей (Print Screen), не Steam.</p>
+        <div class="path" id="sShotsDir">—</div>
+        <div class="btnrow"><button class="btn" id="sShotsBrowse">Выбрать папку…</button></div>
+
+        <div class="panel-title mt">Данные</div>
+        <div class="kv"><span>Язык базы</span><select id="sLang" class="field"><option value="ru">Русский</option><option value="en">English</option></select></div>
+        <div class="kv"><span>Режим (квесты и цены)</span><select id="sMode" class="field"><option value="auto">Авто по логам</option><option value="pve">PvE</option><option value="regular">PvP</option></select></div>
+
+        <div class="panel-title mt">Безопасность</div>
+        <p class="note">Игра не трогается: память не читается, код не внедряется, трафик не перехватывается. Источники — текстовые логи игры, открытая база tarkov.dev и скриншоты квестов с вики (escapefromtarkov.fandom.com, CC BY-SA). Окно — обычное окно Windows; в игре нужен режим «Оконный без рамки».</p>
+        <div class="btnrow"><button class="btn" id="sHelp">Показать подсказки первого запуска</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Поиск по всему (Ctrl+K) ============ -->
+  <div class="palette hidden" id="palette">
+    <div class="palette-box">
+      <div class="palette-input"><i class="ic ic-search"></i><input id="palInput" placeholder="Квест, предмет, карта, модуль убежища…" autocomplete="off"><kbd>Esc</kbd></div>
+      <div class="palette-list" id="palList"></div>
+    </div>
+  </div>
+
+  <!-- ============ Просмотр скриншотов ============ -->
+  <div class="peek hidden" id="peek"><img id="peekImg" alt=""><div class="peek-cap" id="peekCap"></div></div>
+  <div class="lightbox hidden" id="lightbox">
+    <button class="lb-nav prev" id="lbPrev" title="Предыдущий (←)">‹</button>
+    <figure><img id="lbImg" alt=""><figcaption id="lbCap"></figcaption></figure>
+    <button class="lb-nav next" id="lbNext" title="Следующий (→)">›</button>
+    <button class="win close lb-close" id="lbClose" title="Закрыть (Esc)"><svg viewBox="0 0 10 10"><path d="M1.5,1.5 L8.5,8.5 M8.5,1.5 L1.5,8.5"/></svg></button>
+  </div>
+
+  <!-- ============ Загрузка и первый запуск ============ -->
+  <div class="boot" id="boot"><div class="boot-box"><div class="spinner"></div><div id="bootText"><b>Загружаю базу tarkov.dev</b>Квесты, карты, убежище и цены — около 20 МБ, один раз. Потом запуск мгновенный.</div></div></div>
+
+  <div class="modal hidden" id="onboard">
+    <div class="modal-box">
+      <div class="modal-head"><span class="glyph big" aria-hidden="true"></span>
+        <div><h2>Tarkov Helper</h2><p class="note">Квесты, карта и убежище — по логам игры. Игру приложение не трогает.</p></div></div>
+      <ol class="steps">
+        <li><div id="obLogs"></div></li>
+        <li><b>В игре: Настройки → Графика → «Оконный без рамки»</b><span>Иначе окно не будет видно поверх игры.</span></li>
+        <li><b>Горячие клавиши</b><div class="keys" id="obKeys"></div></li>
+        <li><b>Две вещи, которых нет в логах</b><span>Уровень персонажа и уровни модулей убежища — отметь один раз.</span>
+          <div class="btnrow"><button class="btn sm" id="obLevel">Указать уровень</button><button class="btn sm" id="obBase">Отметить убежище</button><button class="btn sm" id="obSettings">Настройки</button></div></li>
+        <li><b>Как пользоваться</b><span>Взял квест в игре — он появится в «Рейде». Загрузил карту — она откроется сама. ★ закрепляет квест, «+/−» считает «2 из 5», значок камеры — скриншоты места с вики. Ctrl+K — поиск по всему.</span></li>
+      </ol>
+      <div class="btnrow end"><button class="btn accent" id="obClose">Понятно</button></div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts"></div>
+
+  <script src="../../node_modules/leaflet/dist/leaflet.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

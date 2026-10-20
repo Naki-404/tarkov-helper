@@ -1,0 +1,69 @@
+{
+  "name": "tarkov-helper",
+  "version": "1.2.0",
+  "description": "Помощник для Escape from Tarkov: квесты, карта, убежище, предметы — только по логам игры",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-packager . TarkovHelper --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icon.ico --asar --ignore=\"^/dist\" --app-copyright=Kreis --win32metadata.FileDescription=\"Tarkov Helper\" --win32metadata.ProductName=\"Tarkov Helper\"",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "keywords": [],
+  "author": "Kreis",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^38.8.6",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  },
+  "productName": "Tarkov Helper",
+  "homepage": "https://github.com/Naki-404/tarkov-helper",
+  "build": {
+    "appId": "com.kreis.tarkovhelper",
+    "productName": "Tarkov Helper",
+    "copyright": "Kreis",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "node_modules/leaflet/dist/leaflet.js",
+      "node_modules/leaflet/dist/leaflet.css",
+      "node_modules/leaflet/dist/images/**"
+    ],
+    "electronLanguages": [
+      "ru",
+      "en-US"
+    ],
+    "asar": true,
+    "compression": "normal",
+    "win": {
+      "icon": "assets/icon.ico",
+      "executableName": "TarkovHelper",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Tarkov Helper",
+      "artifactName": "TarkovHelper-Setup-${version}.exe",
+      "uninstallDisplayName": "Tarkov Helper",
+      "runAfterFinish": false,
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "TarkovHelper-Portable-${version}.exe"
+    }
+  }
+}
