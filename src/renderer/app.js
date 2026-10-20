@@ -25,7 +25,30 @@ const openTasks = new Set(); // раскрытые задачи в панели 
 
 const tmap = new TarkovMap($('#map'), api);
 tmap.onError = (msg) => toast(msg);
-tmap.shotFor = (taskId) => S.wiki.get(taskId)?.images?.[0] || null;
+tmap.shotsFor = (taskId) => S.wiki.get(taskId)?.images || [];
+// выходы и переходы: фото и требования со страницы карты на вики (сопоставление по английскому названию)
+const mapWiki = new Map();
+const normName = (s) => String(s || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+tmap.exitMedia = (item) => {
+  const w = mapWiki.get(loadedMapId);
+  if (!w || !item.en) return null;
+  const n = normName(item.en);
+  const all = [...(w.extracts || []), ...(w.transits || [])];
+  const hit = all.find((x) => normName(x.name) === n) || all.find((x) => { const k = normName(x.name); return k && (k.includes(n) || n.includes(k)); });
+  return hit ? { images: hit.images.map((im) => ({ ...im, caption: hit.name })), requirements: hit.requirements, notes: hit.notes } : null;
+};
+tmap.onExitClick = (item, kind) => {
+  const media = tmap.exitMedia(item, kind);
+  if (media?.images?.length) openGallery(media.images.map((im) => ({ ...im, caption: kind === 'transit' ? item.description : item.name })));
+};
+// здания найдены — этажи переключаются кликом по зданию, кнопки этажей не нужны
+tmap.onBuildings = (n) => updateFloorUi(n);
+function updateFloorUi(nBuildings) {
+  const floors = tmap.floors();
+  const byClick = nBuildings > 0 && tmap.style === 'svg';
+  setHtml($('#floorSeg'), byClick ? '<span class="floor-hint">этажи — клик по зданию</span>'
+    : floors.length ? '<button data-floor="" class="on">Все этажи</button>' + floors.map((f) => `<button data-floor="${esc(f)}">${esc(floorName(f))}</button>`).join('') : '');
+}
 let loadedMapId = null;
 let pointsSig = '';
 let locksSig = '';
@@ -172,9 +195,9 @@ function camBtn(taskId) {
 // превью при наведении
 const peek = $('#peek');
 document.addEventListener('mouseover', (e) => {
-  const el = e.target.closest('[data-peek]');
+  const el = e.target.closest('[data-peek],[data-peekimg]');
   if (!el) { peek.classList.add('hidden'); return; }
-  const img = shots(el.dataset.peek)[Number(el.dataset.i || 0)];
+  const img = el.dataset.peekimg ? { thumb: el.dataset.peekimg, caption: el.dataset.peekcap } : shots(el.dataset.peek)[Number(el.dataset.i || 0)];
   if (!img) return;
   $('#peekImg').src = img.thumb;
   $('#peekCap').textContent = img.caption || '';
@@ -188,25 +211,28 @@ document.addEventListener('mouseover', (e) => {
 });
 document.addEventListener('mouseleave', () => peek.classList.add('hidden'));
 
-// просмотр во весь экран
-let lb = { id: null, i: 0 };
+// просмотр во весь экран: фото места квеста или фото выхода
+let lb = { list: [], i: 0 };
 function openLightbox(taskId, i = 0) {
   const list = shots(taskId);
-  if (!list.length) { toast('Скриншоты ещё загружаются или их нет на вики'); return; }
-  lb = { id: taskId, i };
+  if (!list.length) { toast(S.wiki.has(taskId) ? 'На вики нет фото места для этого квеста — только карта' : 'Фото ещё загружаются с вики'); return; }
+  openGallery(list, i);
+}
+function openGallery(list, i = 0) {
+  if (!list?.length) return;
+  lb = { list, i };
   peek.classList.add('hidden');
   showLb();
   $('#lightbox').classList.remove('hidden');
 }
 function showLb() {
-  const list = shots(lb.id);
-  const img = list[lb.i];
+  const img = lb.list[lb.i];
   $('#lbImg').src = img.full;
-  $('#lbCap').textContent = `${img.caption || ''}   ${lb.i + 1} / ${list.length}`;
-  $('#lbPrev').classList.toggle('hidden', list.length < 2);
-  $('#lbNext').classList.toggle('hidden', list.length < 2);
+  $('#lbCap').textContent = `${img.caption || ''}   ${lb.i + 1} / ${lb.list.length}`;
+  $('#lbPrev').classList.toggle('hidden', lb.list.length < 2);
+  $('#lbNext').classList.toggle('hidden', lb.list.length < 2);
 }
-function lbStep(d) { const n = shots(lb.id).length; if (n) { lb.i = (lb.i + d + n) % n; showLb(); } }
+function lbStep(d) { const n = lb.list.length; if (n) { lb.i = (lb.i + d + n) % n; showLb(); } }
 function closeLightbox() { $('#lightbox').classList.add('hidden'); }
 $('#lbPrev').addEventListener('click', () => lbStep(-1));
 $('#lbNext').addEventListener('click', () => lbStep(1));
@@ -318,8 +344,8 @@ function renderRaid() {
     pointsSig = locksSig = '';
     tmap.style = localStorage.getItem('mapStyle') || 'svg';
     tmap.load(def, m);
-    const floors = tmap.floors();
-    setHtml($('#floorSeg'), floors.length ? '<button data-floor="" class="on">Все этажи</button>' + floors.map((f) => `<button data-floor="${esc(f)}">${esc(floorName(f))}</button>`).join('') : '');
+    updateFloorUi(0);
+    if (m && !mapWiki.has(m.id)) api.getMapWiki(m.id).then((w) => { if (w) { mapWiki.set(m.id, w); render(); } });
     $('#styleSeg').classList.toggle('hidden', !tmap.hasStyles());
     $$('#styleSeg button').forEach((b) => b.classList.toggle('on', b.dataset.style === tmap.style));
     $('#mapCredit').textContent = def?.author ? `карта: ${def.author} · tarkov.dev` : 'tarkov.dev';
@@ -426,7 +452,12 @@ function bringHtml(groups) {
 function exitsHtml(m) {
   if (!m) return '';
   const by = (f) => (m.extracts || []).filter((e) => e.faction === f);
-  const row = (e, color, note) => `<div class="exit" data-focus='${esc(JSON.stringify(e.position))}' title="Показать на карте"><i style="background:${color}"></i><span>${esc(e.name)}</span><small>${note || ''}</small></div>`;
+  const row = (e, color, note) => {
+    const media = tmap.exitMedia(e);
+    const img = media?.images?.[0];
+    const req = media?.requirements || note || '';
+    return `<div class="exit" data-focus='${esc(JSON.stringify(e.position))}' ${img ? `data-peekimg="${esc(img.thumb)}" data-peekcap="${esc(e.name)}"` : ''} title="Показать на карте"><i style="background:${color}"></i><span>${esc(e.name)}${req ? `<small class="exit-req">${esc(req)}</small>` : ''}</span>${img ? '<i class="ic ic-cam exit-cam"></i>' : ''}</div>`;
+  };
   const sec = (title, list, color, note) => (list.length ? `<div class="grp static">${title} · ${list.length}</div>` + list.map((e) => row(e, color, note?.(e))).join('') : '');
   return sec('ЧВК', by('pmc'), 'var(--ok)', (e) => (e.switch ? 'рубильник' : '')) + sec('Общие', by('shared'), 'var(--accent)', (e) => (e.switch ? 'рубильник' : ''))
     + sec('Дикие', by('scav'), 'var(--amber)') + sec('Переходы', (m.transits || []).map((e) => ({ ...e, name: e.description })), 'var(--violet)') || '<div class="empty">Нет данных о выходах</div>';
@@ -449,6 +480,7 @@ $('#floorSeg').addEventListener('click', (e) => {
 $$('#styleSeg button').forEach((b) => b.addEventListener('click', () => {
   localStorage.setItem('mapStyle', b.dataset.style);
   tmap.setStyle(b.dataset.style);
+  updateFloorUi(tmap.buildings.length);
   $$('#styleSeg button').forEach((x) => x.classList.toggle('on', x === b));
 }));
 $$('#layerChips .chip').forEach((b) => {
@@ -576,7 +608,7 @@ function renderQuestDetail(t) {
   const src = info.src === 'log' ? 'статус — по логам игры' : info.src === 'manual' ? 'статус отмечен вручную' : info.src === 'implied' ? 'выполнен по цепочке' : '';
   const gallery = w?.images?.length
     ? `<div class="gallery">${w.images.map((im, i) => `<div class="shot" data-act="shots" data-id="${t.id}" data-i="${i}" title="${esc(im.caption)}"><img src="${esc(im.thumb)}" alt="" loading="lazy"><span>${esc(im.caption)}</span></div>`).join('')}</div>`
-    : `<div class="note">${!t.wikiLink ? 'У квеста нет страницы на вики.' : w ? 'На вики нет скриншотов для этого квеста.' : 'Загружаю скриншоты с вики…'}</div>`;
+    : `<div class="note">${!t.wikiLink ? 'У квеста нет страницы на вики.' : w ? 'На вики для этого квеста есть только карта — фото самого места нет. Точка уже отмечена на нашей карте.' : 'Загружаю фото места с вики…'}</div>`;
   setHtml($('#qDetail'), `
     <div class="dt-head"><img class="portrait" src="${esc(tr.imageLink)}" alt="">
       <div class="dt-title"><h2>${esc(t.name)}</h2>
@@ -592,7 +624,7 @@ function renderQuestDetail(t) {
         ${src ? `<div class="note">${src}</div>` : ''}
       </div></div>
     <div class="dt-sec"><div class="panel-title">Условия</div><div class="dt-obj">${t.objectives.map((o) => objRow(t, o, null)).join('')}</div></div>
-    <div class="dt-sec"><div class="panel-title">Где искать — скриншоты</div>${gallery}
+    <div class="dt-sec"><div class="panel-title">Фото места</div>${gallery}
       ${w?.guide ? `<div class="guide" style="margin-top:8px">${esc(w.guide)}</div>` : ''}
       ${w?.images?.length || w?.guide ? '<div class="attrib">Источник: Escape from Tarkov Wiki (escapefromtarkov.fandom.com), CC BY-SA</div>' : ''}</div>
     ${prev.length || next.length ? `<div class="dt-sec"><div class="panel-title">Цепочка</div>
@@ -896,6 +928,22 @@ api.onDebugSide((x) => {
   if (x === 'onboard') { showOnboarding(); return; }
   closeOnboarding();
   if (x === 'palette') openPalette();
+  if (x?.startsWith('go:')) { const mm = mapByLogId(x.slice(3)); if (mm) { ui.raidMap = mm.id; ui.follow = false; render(); } }
+  const nearCenter = (list) => { const c = tmap.map.getCenter(); return list.sort((p, q) => p.getLatLng().distanceTo(c) - q.getLatLng().distanceTo(c))[0]; };
+  if (x === 'exit') nearCenter(tmap.groups.pmc.getLayers().filter((l) => /<img/.test(l.getTooltip()?._content?.(l) || '')))?.openTooltip();
+  if (x === 'qtip') nearCenter([...tmap.taskMarkers.entries()].filter(([id]) => shots(id).length).map(([, l]) => l[0]))?.openTooltip();
+  if (x?.startsWith('bldg') && tmap.style !== 'svg') { localStorage.setItem('mapStyle', 'svg'); tmap.setStyle('svg'); }
+  if (x?.startsWith('bldg')) setTimeout(() => {
+    const b =[...tmap.buildings].sort((a, c) => c.levels.length - a.levels.length || (c.rect.w * c.rect.h) - (a.rect.w * a.rect.h))[0];
+    if (b) {
+      const lv = b.levels[Math.min(b.levels.length - 1, Number(x.slice(4)) || 1)];
+      tmap.setBuildingFloor(b, lv.id);
+      const r = b.hot.getBoundingClientRect();
+      tmap.map.panTo(tmap.map.containerPointToLatLng([r.left + r.width / 2 - tmap.el.getBoundingClientRect().left, r.top + r.height / 2 - tmap.el.getBoundingClientRect().top]), { animate: false });
+      setTimeout(() => { const r2 = b.hot.getBoundingClientRect(); tmap.openFloorMenu(b, { clientX: r2.left + r2.width / 2, clientY: r2.top + r2.height / 2 }); }, 300);
+    }
+    console.log('buildings', tmap.buildings.length, 'max', Math.max(0, ...tmap.buildings.map((y) => y.levels.length)));
+  }, tmap.buildings.length ? 0 : 2500);
   if (x?.startsWith('zoom')) { const z = Number(x.slice(4)) || 2; const mk = [...tmap.questMarkers.values()][0]?.[0]; tmap.map?.setView(mk ? mk.getLatLng() : tmap.map.getCenter(), tmap.map.getZoom() + z, { animate: false }); }
   if (x?.startsWith('lb:')) { const t = S.data.tasks.find((y) => y.name === x.slice(3)); if (t) api.getWiki(t.id).then((d) => { S.wiki.set(t.id, d); openLightbox(t.id); }); }
   if (x?.startsWith('sel:')) { const t = S.data.tasks.find((y) => y.name === x.slice(4)); if (t) { ui.qSel = t.id; ui.qStatus = 'all'; render(); } }

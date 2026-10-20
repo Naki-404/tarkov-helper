@@ -574,6 +574,11 @@ handle('relaunch', () => { quitting = true; try { progress.save(); } catch {} ap
 // скриншоты квеста с вики: ссылка берётся из базы, интерфейс передаёт только id квеста
 const wikiTask = (id) => (isId(id) ? gameData?.tasks.find((t) => t.id === id && t.wikiLink) : null);
 handle('getWiki', async (id) => { const t = wikiTask(id); return t ? wiki.get(t) : null; });
+// скриншоты выходов и переходов карты
+handle('getMapWiki', async (id) => {
+  const m = isId(id) ? gameData?.maps.find((x) => x.id === id && x.wiki) : null;
+  return m ? wiki.getMap(m) : null;
+});
 handle('prefetchWiki', (ids) => {
   if (!Array.isArray(ids)) return;
   const tasks = ids.slice(0, 60).map(wikiTask).filter(Boolean);

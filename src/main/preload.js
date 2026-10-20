@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('openExternal', url),
   relaunch: () => ipcRenderer.invoke('relaunch'),
   getWiki: (id) => ipcRenderer.invoke('getWiki', id),
+  getMapWiki: (id) => ipcRenderer.invoke('getMapWiki', id),
   prefetchWiki: (ids) => ipcRenderer.invoke('prefetchWiki', ids),
   onWiki: on('wiki'),
   onState: on('state'),

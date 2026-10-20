@@ -8,7 +8,7 @@ const path = require('path');
 
 const BASE = 'https://json.tarkov.dev';
 const STALE_MS = 12 * 60 * 60 * 1000; // данные старше 12 часов обновляются в фоне (база ~20 МБ)
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 const TRANSLATE_KEYS = new Set(['name', 'shortName', 'description', 'exitName', 'targetNames', 'exitStatus',
   'effects', 'bodyParts', 'zoneName', 'Nickname', 'customizationTypeName']);
@@ -31,7 +31,8 @@ async function dataset(mode, name, lang) {
     lang !== 'en' ? getJson(`${BASE}/${jm}/${name}_en`).catch(() => null) : Promise.resolve(null),
   ]);
   const dict = { ...(en?.data || {}), ...(tr?.data || {}) };
-  return { data: main.data, dict };
+  // en — отдельно: английские названия нужны для сопоставления с вики
+  return { data: main.data, dict, en: lang === 'en' ? tr?.data || {} : en?.data || {} };
 }
 
 function makeTranslator(dict) {
@@ -86,13 +87,18 @@ function buildTasks(raw, tr) {
   }));
 }
 
-function buildMaps(raw, tr) {
+function buildMaps(raw, tr, enDict = {}) {
   const maps = Object.values(raw.maps);
+  // английские названия выходов и переходов (до перевода) — по ним ищутся скриншоты на вики
+  for (const m of maps) {
+    for (const e of m.extracts || []) e._en = enDict[e.name] || e.name;
+    for (const t of m.transits || []) t._en = enDict[t.description] || t.description;
+  }
   tr.walk(maps);
   return maps.map((m) => ({
     ...pick(m, ['id', 'name', 'normalizedName', 'nameId', 'scenePath', 'raidDuration', 'players', 'minPlayerLevel', 'maxPlayerLevel', 'wiki']),
-    extracts: (m.extracts || []).map((e) => ({ name: e.name, faction: e.faction, position: pos(e.position), outline: e.outline?.map(pos), top: e.top, bottom: e.bottom, switch: !!e.switch })),
-    transits: (m.transits || []).map((t) => ({ description: t.description, position: pos(t.position), top: t.top, bottom: t.bottom })),
+    extracts: (m.extracts || []).map((e) => ({ name: e.name, en: e._en, faction: e.faction, position: pos(e.position), outline: e.outline?.map(pos), top: e.top, bottom: e.bottom, switch: !!e.switch })),
+    transits: (m.transits || []).map((t) => ({ description: t.description, en: t._en, position: pos(t.position), top: t.top, bottom: t.bottom })),
     locks: (m.locks || []).filter((l) => l.key).map((l) => ({ key: l.key, lockType: l.lockType, needsPower: l.needsPower, position: pos(l.position) })),
     bosses: (m.bosses || []).map((b) => ({ name: b.name || b.boss, spawnChance: b.spawnChance })),
     accessKeys: m.accessKeys || [],
@@ -166,7 +172,7 @@ async function fetchAll(lang, mode) {
     fetchedAt: Date.now(),
     lang, mode,
     tasks: taskList,
-    maps: buildMaps(maps.data, trM),
+    maps: buildMaps(maps.data, trM, maps.en),
     hideout: buildHideout(hideout.data, trH),
     traders: traderList,
     items: itemMap,

@@ -31,6 +31,15 @@ function guideSection(html) {
   return html.slice(start, end);
 }
 
+// Карта с обводкой — не то, что нужно: место уже отмечено точкой на нашей карте.
+// Оставляем только фото самого места / предмета. Признак карты — подпись или имя файла.
+const MAP_CAPTION = /\b(marked|on (the )?map|map\b|overview|locations? of)|карт/i;
+const MAP_FILE = /map|overview|_guide\.png/i;
+function isMapImage(img) {
+  const file = decodeURIComponent((img.full || '').split('/images/')[1]?.split('/revision')[0] || '');
+  return MAP_CAPTION.test(img.caption || '') || MAP_FILE.test(file.split('/').pop() || '');
+}
+
 function parse(html) {
   const sec = guideSection(html);
   const images = [];
@@ -38,6 +47,7 @@ function parse(html) {
   const push = (full, thumb, caption) => {
     if (!IMG_HOST.test(full || '') || seen.has(full)) return;
     if (/Icon\.(png|jpg|webp)/i.test(full)) return; // иконки предметов из таблицы — не скриншоты
+    if (isMapImage({ full, caption: text(caption || '') })) return;
     seen.add(full);
     images.push({ full, thumb: IMG_HOST.test(thumb || '') ? thumb : full, caption: text(caption || '') });
   };
@@ -58,7 +68,32 @@ function parse(html) {
   const paras = [...sec.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => text(m[1])).filter((t) => t.length > 20);
   let guide = paras.join('\n\n');
   if (guide.length > 1400) guide = guide.slice(0, 1400).replace(/\s+\S*$/, '') + '…';
-  return { images: images.slice(0, 16), guide };
+  return { images: images.slice(0, 30), guide };
+}
+
+// Страница карты: таблицы «Extractions» и «Transits» — скриншот выхода, фракция, требования, примечания.
+function parseMapPage(html) {
+  const section = (id) => {
+    const a = html.indexOf(`id="${id}"`);
+    if (a < 0) return '';
+    const b = html.indexOf('<h2', a + 10);
+    return html.slice(a, b < 0 ? html.length : b);
+  };
+  const rows = (sec) => [...sec.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((m) => m[1]).filter((r) => r.includes('mw-file-description'));
+  const imgOf = (cell) => {
+    const full = decode(/<a href="(https:\/\/static\.wikia\.nocookie\.net\/[^"]+)"[^>]*class="mw-file-description/.exec(cell)?.[1] || '');
+    const thumb = decode(/(?:data-src|src)="(https:\/\/static\.wikia\.nocookie\.net\/[^"]+)"/.exec(cell)?.[1] || '');
+    return IMG_HOST.test(full) ? { full, thumb: IMG_HOST.test(thumb) ? thumb : full } : null;
+  };
+  const read = (sec) => rows(sec).map((r) => {
+    const cells = [...r.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((c) => c[1]);
+    if (cells.length < 3) return null;
+    const img = imgOf(cells[0]);
+    const extra = cells.slice(1).map(imgOf).filter(Boolean);
+    const clean = (c) => (c ? text(c).replace(/^-$/, '') : '');
+    return { name: clean(cells[1]), faction: clean(cells[2]), requirements: clean(cells[5]), notes: clean(cells[6]), images: [img, ...extra].filter(Boolean) };
+  }).filter((x) => x && x.name && x.images.length);
+  return { extracts: read(section('Extractions')), transits: read(section('Transits')) };
 }
 
 class Wiki {
@@ -74,8 +109,32 @@ class Wiki {
   cached(id) {
     try {
       const d = JSON.parse(fs.readFileSync(this.file(id), 'utf8'));
-      return { ...d, stale: !(Date.now() - d.ts < TTL) };
+      // кэш прошлых версий мог содержать карты — отфильтровываем и при чтении
+      return { ...d, images: (d.images || []).filter((i) => !isMapImage(i)), stale: !(Date.now() - d.ts < TTL) };
     } catch { return null; }
+  }
+
+  // скриншоты выходов и переходов карты (страница карты на вики)
+  async getMap(map) {
+    const f = path.join(this.dir, 'map-' + map.id + '.json');
+    try {
+      const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+      if (Date.now() - d.ts < TTL) return d;
+    } catch { /* нет кэша */ }
+    const title = pageTitle(map.wiki);
+    if (!title) return { id: map.id, extracts: [], transits: [] };
+    try {
+      const url = `${API}?action=parse&page=${encodeURIComponent(title)}&prop=text&redirects=1&format=json&formatversion=2`;
+      const res = await fetch(url, { headers: { 'User-Agent': UA } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      const d = { id: map.id, url: map.wiki, ...parseMapPage(j?.parse?.text || ''), ts: Date.now() };
+      fs.mkdirSync(this.dir, { recursive: true });
+      fs.writeFileSync(f, JSON.stringify(d));
+      return d;
+    } catch (e) {
+      try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return { id: map.id, extracts: [], transits: [], error: e.message }; }
+    }
   }
 
   // task: { id, wikiLink }
@@ -124,4 +183,4 @@ class Wiki {
   }
 }
 
-module.exports = { Wiki, parse, pageTitle };
+module.exports = { Wiki, parse, parseMapPage, isMapImage, pageTitle };
