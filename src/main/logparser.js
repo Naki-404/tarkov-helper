@@ -109,7 +109,9 @@ function entryToEvent(entry) {
     if ((m = /^Transit reconnect status:\w+ raidMode:\w+ location:([\w-]+)/.exec(text))) {
       return { type: 'mapLoading', ts, location: m[1] };
     }
-    if (/^GameStarted:/.test(text)) return { type: 'raidStarted', ts };
+    // перед боем у ЧВК есть отсчёт (GameStarting → GameStarted через ~10 с), у Дикого его почти нет
+    if ((m = /^GameStarting:([\d.,]+)/.exec(text))) return { type: 'raidStarting', ts, t: parseFloat(m[1].replace(',', '.')) };
+    if ((m = /^GameStarted:([\d.,]+)/.exec(text))) return { type: 'raidStarted', ts, t: parseFloat(m[1].replace(',', '.')) };
     if (/^(Network|Local) game matching (cancelled|aborted)/.test(text)) return { type: 'matchingCancelled', ts };
     if (/^Matching with group id/.test(text)) return { type: 'matchingStarted', ts };
     return null;
@@ -133,7 +135,7 @@ function entryToEvent(entry) {
       return { type: 'raidEnded', ts, location: json.location || null };
     }
     if (json.type === 'groupMatchRaidSettings' && json.raidSettings) {
-      return { type: 'mapLoading', ts, location: json.raidSettings.location || null };
+      return { type: 'mapLoading', ts, location: json.raidSettings.location || null, side: json.raidSettings.side === 'Savage' ? 'scav' : json.raidSettings.side === 'Pmc' ? 'pmc' : null };
     }
     return null;
   }

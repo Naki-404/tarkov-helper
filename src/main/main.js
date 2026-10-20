@@ -43,6 +43,7 @@ const live = {
   mode: null,        // pve | regular — из «Session mode» в логах
   map: null,         // id карты (как в логах игры)
   raidState: 'idle', // offline | idle | matching | loading | inraid
+  side: null,        // pmc | scav — за кого текущий/последний рейд
   position: null,    // { map, x, y, z, ts } из имени скриншота
   events: [],        // последние события для вкладки «Лог»
 };
@@ -191,7 +192,7 @@ function applyEvent(ev, { live: isLive }) {
       }
       break;
     case 'raidStarted':
-      if (isLive) { live.raidState = 'inraid'; pushEvent(`Рейд начался: ${mapName(live.map)}`, ev.ts); }
+      if (isLive) { live.raidState = 'inraid'; pushEvent(`Рейд начался: ${mapName(live.map)} · ${live.side === 'scav' ? 'за Дикого' : 'за ЧВК'}`, ev.ts); }
       break;
     case 'raidEnded':
       if (isLive) { live.raidState = 'idle'; pushEvent(`Рейд окончен: ${mapName(ev.location || live.map)}`, ev.ts); }
@@ -215,7 +216,22 @@ watcher.on('activity', (active) => {
   if (!active && live.raidState !== 'inraid') { live.raidState = 'offline'; stateChanged(); }
   if (active) { wakeFromOffline(); stateChanged(); }
 });
+// За кого рейд: в группе — из настроек рейда; иначе по отсчёту перед боем (у ЧВК ~10 с, у Дикого нет)
+let startingT = null;
+let groupSide = null;
+function trackSide(ev) {
+  if (ev.type === 'matchingStarted') { startingT = null; }
+  if (ev.type === 'mapLoading' && ev.side) groupSide = ev.side;
+  if (ev.type === 'raidStarting') startingT = ev.t;
+  if (ev.type === 'raidStarted') {
+    live.side = groupSide || (startingT != null && ev.t - startingT > 3 ? 'pmc' : 'scav');
+    startingT = null; groupSide = null;
+  }
+  if (ev.type === 'raidEnded') groupSide = null;
+}
+
 watcher.on('event', (ev) => {
+  trackSide(ev);
   if (scanning && ev.type === 'task') { queuedLive.push(ev); return; }
   if (ev.replay) {
     // при запуске приложения: молча восстанавливаем режим, карту и состояние рейда
@@ -321,7 +337,7 @@ const boundsKey = () => (settings.get('compact') ? 'compactWindow' : 'window');
 function createWindow() {
   const w = settings.get(boundsKey());
   const opts = {
-    width: w.width, height: w.height, minWidth: 340, minHeight: 420,
+    width: w.width, height: w.height, minWidth: 360, minHeight: 420,
     frame: false, show: false, backgroundColor: '#0A0C10',
     alwaysOnTop: settings.get('alwaysOnTop'), skipTaskbar: false,
     icon: fs.existsSync(ICON) ? ICON : undefined,
@@ -482,7 +498,7 @@ const handle = (name, fn) => ipcMain.handle(name, (_e, ...args) => fn(...args));
 const mutate = (fn) => (...args) => { const r = fn(...args); saveProgressSoon(); stateChanged(); return r; };
 
 // ---------- IPC ----------
-handle('init', () => ({ state: snapshot(), data: gameData, events: live.events }));
+handle('init', () => ({ state: snapshot(), data: gameData, events: live.events, version: app.getVersion() }));
 handle('setManual', mutate((id, status) => {
   if (isId(id) && (status === null || ['active', 'complete', 'failed'].includes(status))) progress.setManual(id, status);
 }));
@@ -497,7 +513,10 @@ handle('setWipe', mutate((ts) => progress.setWipe(Number(ts) || 0)));
 handle('setWipeIgnore', mutate((on) => progress.setWipeIgnore(!!on)));
 handle('setHideout', mutate((id, lvl) => { if (isId(id)) progress.setHideout(id, Math.max(0, Math.min(10, Number(lvl) || 0))); }));
 handle('setOwned', mutate((id, n) => { if (isId(id)) progress.setOwned(id, Math.max(0, Math.min(1e7, Number(n) || 0))); }));
-handle('getMapDefs', () => JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'assets', 'mapdefs.json'), 'utf8')));
+const ASSETS = path.join(__dirname, '..', '..', 'assets');
+handle('getMapDefs', () => JSON.parse(fs.readFileSync(path.join(ASSETS, 'mapdefs.json'), 'utf8')));
+// русские названия мест на картах (свой словарь)
+handle('getLabelsRu', () => { try { return JSON.parse(fs.readFileSync(path.join(ASSETS, 'map-labels-ru.json'), 'utf8')); } catch { return {}; } });
 // SVG-карты tarkov.dev: загружаются один раз и хранятся в кэше (только с assets.tarkov.dev)
 const sanitizeSvg = (txt) => txt
   .replace(/<script[\s\S]*?<\/script\s*>/gi, '')
@@ -505,6 +524,9 @@ const sanitizeSvg = (txt) => txt
   .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, '');
 handle('getSvg', async (url) => {
   if (typeof url !== 'string' || !/^https:\/\/assets\.tarkov\.dev\/maps\/svg\/[\w-]+\.svg$/.test(url)) throw new Error('bad url');
+  // векторные карты лежат в самом приложении (assets/maps) — сеть нужна, только если файла нет
+  const bundled = path.join(ASSETS, 'maps', path.basename(url));
+  if (fs.existsSync(bundled)) return fs.readFileSync(bundled, 'utf8');
   const f = path.join(userDir, 'th-cache', 'svg', path.basename(url));
   try {
     const st = fs.statSync(f);
@@ -522,6 +544,16 @@ handle('getSvg', async (url) => {
     throw e;
   }
 });
+// полный сброс статистики профиля: квесты, счётчики, убежище, собранные предметы
+handle('resetAll', async () => {
+  const r = await dialog.showMessageBox(win, { type: 'warning', buttons: ['Сбросить всё', 'Отмена'], defaultId: 1, cancelId: 1,
+    message: 'Сбросить всю статистику текущего профиля?', detail: 'Удалятся квесты из логов и ручные отметки, счётчики, закреплённые квесты, уровни убежища и собранные предметы. Квесты из логов можно вернуть кнопкой «Пересканировать логи».' });
+  if (r.response !== 0) return false;
+  const p = progress.active; progress.resetActive(); p.hideout = {}; p.owned = {}; delete p.levelSetAt; p.level = 1;
+  progress.save(); stateChanged(); return true;
+});
+// заново скачать фото квестов и выходов с вики
+handle('clearWiki', () => { try { fs.rmSync(path.join(userDir, 'th-cache', 'wiki'), { recursive: true, force: true }); } catch {} wiki.inflight.clear(); return true; });
 handle('resetProfile', async () => {
   const r = await dialog.showMessageBox(win, { type: 'warning', buttons: ['Сбросить квесты', 'Отмена'], defaultId: 1, cancelId: 1,
     message: 'Сбросить прогресс квестов текущего профиля?',
@@ -565,6 +597,9 @@ handle('win', (action) => {
   if (action === 'compact') toggleCompact();
   if (action === 'hide') win.hide();
   if (action === 'clickThrough') setClickThrough(!clickThrough);
+  // «сквозь окно»: над верхней панелью мышь снова ловится окном, чтобы можно было нажать кнопки
+  if (action === 'ctHover-on' && clickThrough) win.setIgnoreMouseEvents(false);
+  if (action === 'ctHover-off' && clickThrough) win.setIgnoreMouseEvents(true, { forward: true });
   if (action === 'pin') {
     const on = !settings.get('alwaysOnTop'); settings.set({ alwaysOnTop: on }); win.setAlwaysOnTop(on, 'screen-saver'); stateChanged();
   }
@@ -623,7 +658,7 @@ function runShots(dir) {
     const [p, mapId, side] = pages[i++].split('@');
     if (p === 'compact') toggleCompact(); else send('showTab', p);
     if (mapId) send('mapChanged', mapId);
-    if (side) send('debugSide', side);
+    if (side?.startsWith('w:')) win.setSize(Number(side.slice(2)), 860); else if (side) send('debugSide', side);
     await new Promise((r) => setTimeout(r, Number(process.env.TH_DELAY || 3500)));
     const img = await win.webContents.capturePage();
     const name = `shot-${p}${mapId ? '-' + mapId : ''}${side ? '-' + side : ''}`.replace(/[^\w.-]+/g, '_');

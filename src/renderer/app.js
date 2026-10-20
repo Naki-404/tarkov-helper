@@ -151,7 +151,7 @@ function renderBar() {
     const mode = live.mode || s.profile.mode;
     const m = mapByLogId(live.map);
     $('#tlMain').textContent = RAID_LABEL[live.raidState] || 'в меню';
-    $('#tlSub').textContent = [mode === 'pve' ? 'PvE' : mode ? 'PvP' : '', live.raidState !== 'idle' && live.raidState !== 'offline' ? m?.name : '', s.profile.effectiveLevel ? `ур. ${s.profile.effectiveLevel}` : ''].filter(Boolean).join(' · ');
+    $('#tlSub').textContent = [mode === 'pve' ? 'PvE' : mode ? 'PvP' : '', live.raidState !== 'idle' && live.raidState !== 'offline' ? m?.name : '', live.raidState === 'inraid' && live.side ? (live.side === 'scav' ? 'за Дикого' : 'за ЧВК') : '', s.profile.effectiveLevel ? `ур. ${s.profile.effectiveLevel}` : ''].filter(Boolean).join(' · ');
     led.classList.add(live.raidState === 'inraid' ? 'live' : live.raidState === 'loading' || live.raidState === 'matching' ? 'busy' : live.raidState === 'offline' ? 'off' : 'ok');
   }
   $('#btnPin').classList.toggle('on', !!s.settings.alwaysOnTop);
@@ -175,6 +175,35 @@ $('#btnCompact').addEventListener('click', () => api.win('compact'));
 $('#btnSettings').addEventListener('click', () => openSettings());
 $('#btnHelp').addEventListener('click', () => showOnboarding());
 $('#omniBtn').addEventListener('click', () => openPalette());
+
+// ---------------------------------------------------------------- подсказки (вместо системных title)
+const tip = document.createElement('div');
+tip.className = 'uitip hidden';
+document.body.appendChild(tip);
+let tipEl = null;
+document.addEventListener('mouseover', (e) => {
+  const el = e.target.closest('[title],[data-tip]');
+  if (el && el.hasAttribute('title')) { el.dataset.tip = el.getAttribute('title'); el.removeAttribute('title'); }
+  if (!el || !el.dataset.tip || el.closest('.leaflet-container')) { tip.classList.add('hidden'); tipEl = null; return; }
+  if (tipEl === el) return;
+  tipEl = el;
+  tip.textContent = el.dataset.tip;
+  tip.classList.remove('hidden');
+  const r0 = el.getBoundingClientRect();
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = r0.left + r0.width / 2 - w / 2; x = Math.max(6, Math.min(innerWidth - w - 6, x));
+  let y = r0.bottom + 8; if (y + h > innerHeight - 6) y = r0.top - h - 8;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+document.addEventListener('mousedown', () => tip.classList.add('hidden'));
+
+// «сквозь окно»: над верхней панелью окно снова ловит мышь, чтобы можно было нажать кнопки
+let ctHover = false;
+document.addEventListener('mousemove', (e) => {
+  if (!S.state?.clickThrough) { ctHover = false; return; }
+  const over = !!e.target.closest?.('.bar');
+  if (over !== ctHover) { ctHover = over; api.win(over ? 'ctHover-on' : 'ctHover-off'); }
+});
 
 // ---------------------------------------------------------------- скриншоты с вики
 const wikiWanted = new Set();
@@ -348,7 +377,6 @@ function renderRaid() {
     if (m && !mapWiki.has(m.id)) api.getMapWiki(m.id).then((w) => { if (w) { mapWiki.set(m.id, w); render(); } });
     $('#styleSeg').classList.toggle('hidden', !tmap.hasStyles());
     $$('#styleSeg button').forEach((b) => b.classList.toggle('on', b.dataset.style === tmap.style));
-    $('#mapCredit').textContent = def?.author ? `карта: ${def.author} · tarkov.dev` : 'tarkov.dev';
     const pos = S.state.live.position;
     if (pos && ids.has(mapByLogId(pos.map)?.id)) tmap.setPlayer(pos);
   }
@@ -364,7 +392,7 @@ function renderRaid() {
     const points = [];
     const addPoints = (t, extra) => {
       for (const o of t.objectives) {
-        const base = { objectiveId: o.id, taskId: t.id, title: t.name, sub: trader(t.trader).name, text: objText(o), ...extra(o) };
+        const base = { objectiveId: o.id, taskId: t.id, title: t.name, sub: trader(t.trader).name, text: objText(o), type: o.type, ...extra(o) };
         for (const z of o.zones || []) if (ids.has(z.map) && z.position) points.push({ ...base, kind: 'zone', position: z.position, outline: z.outline, top: z.top, bottom: z.bottom });
         for (const l of o.possibleLocations || []) if (ids.has(l.map)) for (const p of l.positions) points.push({ ...base, kind: 'item', position: p });
       }
@@ -566,7 +594,7 @@ function renderDossier() {
     const pct = Math.round(taskPct(t) * 100);
     return `<div class="qrow${ui.qSel === t.id ? ' on' : ''}" data-task="${t.id}"><img src="${esc(trader(t.trader).imageLink)}" alt="" loading="lazy">
       <div class="qr-t"><div class="qr-n">${isTracked(t.id) ? '<span class="star-on">★</span> ' : ''}${esc(t.name)}</div><div class="qr-m"><i class="dot ${st}"></i>${esc(trader(t.trader).name)} · ${esc(mapNames(t)[0] || 'любая карта')}${t.minPlayerLevel > 1 ? ` · ур. ${t.minPlayerLevel}` : ''}</div></div>
-      ${st === 'active' ? `<div class="bar" title="${pct}%"><i style="width:${pct}%"></i></div>` : ''}</div>`;
+      ${st === 'active' && t.objectives.length ? `<span class="qr-p${pct === 100 ? ' full' : ''}" title="Условий выполнено: ${pct}%">${t.objectives.filter((o) => !o.optional && objDone(t, o)).length}/${t.objectives.filter((o) => !o.optional).length}</span>` : ''}</div>`;
   }).join('') : `<div class="empty"><b>Пусто</b>${ui.qStatus === 'active' ? 'Активные квесты появляются сами, когда берёшь их в игре. Взятые до установки — отметь «Уже взят» во вкладке «Можно взять».' : 'Измени фильтры или поиск'}</div>`);
   renderQuestDetail(idx.task.get(ui.qSel));
 }
@@ -803,6 +831,8 @@ function renderSettings() {
   if (document.activeElement !== $('#sScale')) $('#sScale').value = s.uiScale || 1;
   $('#sOpacityVal').textContent = Math.round(s.opacity * 100) + '%';
   $('#sScaleVal').textContent = Math.round((s.uiScale || 1) * 100) + '%';
+  const di = S.state.dataInfo;
+  $('#sDataInfo').textContent = di ? `${di.tasks} квестов · ${di.mode === 'pve' ? 'PvE' : 'PvP'} · ${new Date(di.fetchedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '—';
   $('#sTop').checked = !!s.alwaysOnTop; $('#sNotify').checked = !!s.notify; $('#sLite').checked = s.lite !== false;
   for (const [id, k] of HK) if (document.activeElement !== $('#' + id)) $('#' + id).value = s.hotkeys[k] || '';
 }
@@ -840,6 +870,12 @@ $('#sHkSave').addEventListener('click', async () => {
   toast(r.failed?.length ? 'Не удалось назначить: ' + r.failed.join(', ') + ' — занято другой программой?' : 'Горячие клавиши применены');
 });
 $('#sHelp').addEventListener('click', () => { $('#settings').classList.add('hidden'); showOnboarding(); });
+const refreshBase = () => { toast('Обновляю базу квестов tarkov.dev — новые квесты появятся, удалённые исчезнут'); api.refreshData(); };
+$('#sRefresh').addEventListener('click', refreshBase);
+$('#qRefresh').addEventListener('click', refreshBase);
+$('#sClearWiki').addEventListener('click', async () => { await api.clearWiki(); S.wiki.clear(); wikiWanted.clear(); wikiAsked.clear(); mapWiki.clear(); loadedMapId = null; toast('Фото с вики будут скачаны заново'); render(); });
+$('#sRescan').addEventListener('click', async () => { toast('Пересканирую логи…'); await api.rescan(); });
+$('#sResetAll').addEventListener('click', () => api.resetAll());
 
 // ---------------------------------------------------------------- ПОИСК ПО ВСЕМУ (Ctrl+K)
 let palItems = [], palSel = 0;
@@ -906,8 +942,20 @@ api.onState((s) => {
   const prev = S.state?.live?.map;
   S.state = s;
   if (ui.follow && s.live.map && s.live.map !== prev) { const m = mapByLogId(s.live.map); if (m && defFor(m)) ui.raidMap = m.id; }
+  if (ui.follow && s.live.side && s.live.side !== lastSide) { if (lastSide !== null || s.live.raidState === 'inraid') applySide(s.live.side); lastSide = s.live.side; }
   render();
 });
+// рейд за Дикого — выходы и спавны Диких, за ЧВК — ЧВК (если включено «следовать за игрой»)
+let lastSide = null;
+function applySide(side) {
+  const want = side === 'scav' ? { pmc: false, scav: true, spawnScav: true, spawnPmc: false } : { pmc: true, scav: false, spawnPmc: true, spawnScav: false };
+  for (const [k, on] of Object.entries(want)) {
+    $(`#layerChips [data-layer="${k}"]`)?.classList.toggle('on', on);
+    localStorage.setItem('layer-' + k, on ? '1' : '0');
+    tmap.setLayer(k, on);
+  }
+  toast(side === 'scav' ? 'Рейд за Дикого — показаны выходы и спавны Диких' : 'Рейд за ЧВК — показаны выходы и спавны ЧВК');
+}
 api.onData((d) => {
   S.data = d; itemIndex = null; indexData();
   pointsSig = locksSig = '';
@@ -928,21 +976,25 @@ api.onDebugSide((x) => {
   if (x === 'onboard') { showOnboarding(); return; }
   closeOnboarding();
   if (x === 'palette') openPalette();
+  if (x === 'settings') openSettings();
+  if (x === 'sbottom') { openSettings(); const sc = [...$('#settings').querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 20 && getComputedStyle(e).overflowY !== 'visible'); if (sc) sc.scrollTop = 1e5; }
+  if (x === 'spawns') for (const k of ['spawnPmc', 'spawnScav']) { $(`#layerChips [data-layer="${k}"]`)?.classList.add('on'); tmap.setLayer(k, true); }
   if (x?.startsWith('go:')) { const mm = mapByLogId(x.slice(3)); if (mm) { ui.raidMap = mm.id; ui.follow = false; render(); } }
   const nearCenter = (list) => { const c = tmap.map.getCenter(); return list.sort((p, q) => p.getLatLng().distanceTo(c) - q.getLatLng().distanceTo(c))[0]; };
   if (x === 'exit') nearCenter(tmap.groups.pmc.getLayers().filter((l) => /<img/.test(l.getTooltip()?._content?.(l) || '')))?.openTooltip();
   if (x === 'qtip') nearCenter([...tmap.taskMarkers.entries()].filter(([id]) => shots(id).length).map(([, l]) => l[0]))?.openTooltip();
   if (x?.startsWith('bldg') && tmap.style !== 'svg') { localStorage.setItem('mapStyle', 'svg'); tmap.setStyle('svg'); }
   if (x?.startsWith('bldg')) setTimeout(() => {
-    const b =[...tmap.buildings].sort((a, c) => c.levels.length - a.levels.length || (c.rect.w * c.rect.h) - (a.rect.w * a.rect.h))[0];
+    const want = x.split(':')[1];
+    const b = [...tmap.buildings].filter((y) => !want || (y.name || '').toLowerCase().includes(want.toLowerCase())).sort((p, q) => q.levels.length - p.levels.length || (q.levels.at(-1)?.order || 0) - (p.levels.at(-1)?.order || 0))[0];
     if (b) {
-      const lv = b.levels[Math.min(b.levels.length - 1, Number(x.slice(4)) || 1)];
-      tmap.setBuildingFloor(b, lv.id);
-      const r = b.hot.getBoundingClientRect();
-      tmap.map.panTo(tmap.map.containerPointToLatLng([r.left + r.width / 2 - tmap.el.getBoundingClientRect().left, r.top + r.height / 2 - tmap.el.getBoundingClientRect().top]), { animate: false });
-      setTimeout(() => { const r2 = b.hot.getBoundingClientRect(); tmap.openFloorMenu(b, { clientX: r2.left + r2.width / 2, clientY: r2.top + r2.height / 2 }); }, 300);
+      const lv = tmap.levelsOf(b).filter((l) => l.id);
+      tmap.setBuildingLevel(b, lv[Math.min(lv.length - 1, parseInt(x.slice(4)) || 0)].id);
+      const c = tmap.fromSvg(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
+      if (c) tmap.map.setView(c, tmap.map.getZoom() + 1.5, { animate: false });
+      setTimeout(() => { b.hot.classList.add('hover'); const r2 = b.hot.getBoundingClientRect(); b.hot.dispatchEvent(new MouseEvent('mousemove', { clientX: r2.left + r2.width * 0.7, clientY: r2.top + r2.height * 0.8, bubbles: true })); }, 400);
     }
-    console.log('buildings', tmap.buildings.length, 'max', Math.max(0, ...tmap.buildings.map((y) => y.levels.length)));
+    console.log('buildings', tmap.buildings.length, 'max', Math.max(0, ...tmap.buildings.map((y) => y.levels.length)), (b && b.name) || '');
   }, tmap.buildings.length ? 0 : 2500);
   if (x?.startsWith('zoom')) { const z = Number(x.slice(4)) || 2; const mk = [...tmap.questMarkers.values()][0]?.[0]; tmap.map?.setView(mk ? mk.getLatLng() : tmap.map.getCenter(), tmap.map.getZoom() + z, { animate: false }); }
   if (x?.startsWith('lb:')) { const t = S.data.tasks.find((y) => y.name === x.slice(3)); if (t) api.getWiki(t.id).then((d) => { S.wiki.set(t.id, d); openLightbox(t.id); }); }
@@ -951,7 +1003,9 @@ api.onDebugSide((x) => {
 
 (async () => {
   S.mapDefs = await api.getMapDefs();
+  tmap.labelsRu = await api.getLabelsRu();
   const init = await api.init();
+  $('#sVersion').textContent = init.version ? 'v' + init.version : '';
   S.state = init.state;
   S.events = init.events || [];
   if (init.data) { S.data = init.data; indexData(); }

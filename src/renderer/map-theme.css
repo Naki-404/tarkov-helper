@@ -1,0 +1,93 @@
+/* Тема векторной карты Tarkov Helper. Геометрия — assets/maps/*.svg, цвета и обводки — здесь.
+   Классы фигур в SVG: land, trees, water, rock, cement, tarmac, gravel, building, floor, locked, stairs, fence, road_*, … */
+
+.th-svg .land { fill: #0E1A1F !important; }
+.th-svg .trees, .th-svg .wood, .th-svg .green, .th-svg .forest { fill: #10262A !important; }
+.th-svg .water { fill: #0F2C44 !important; }
+.th-svg .rock { fill: #263039 !important; }
+.th-svg .cement, .th-svg .structure { fill: #222C37 !important; }
+.th-svg .tarmac { fill: #2B3541 !important; }
+.th-svg .gravel { fill: #2E2A24 !important; }
+.th-svg .building { fill: #16202B !important; stroke: #2DD4EE !important; stroke-opacity: .25 !important; stroke-width: .6px !important; }
+.th-svg .floor { fill: #1E2B38 !important; stroke: #2DD4EE !important; stroke-opacity: .45 !important; stroke-width: .5px !important; }
+.th-svg .locked { fill: #2A1E28 !important; stroke: #F87171 !important; stroke-opacity: .5 !important; stroke-width: .5px !important; }
+.th-svg .wall { fill: #7FA3B8 !important; }
+.th-svg .stairs { fill: #F2B544 !important; }
+.th-svg .road_tarmac { stroke: #36424F !important; }
+.th-svg .road_gravel { stroke: #3D3529 !important; }
+.th-svg .railroad { stroke: #5A4034 !important; }
+.th-svg .fence { stroke: #2F4A48 !important; }
+.th-svg .powerline { stroke: #4A4421 !important; }
+.th-svg .danger, .th-svg .danger_small { fill: #F87171 !important; fill-opacity: .14 !important; stroke: #F87171 !important; stroke-opacity: .55 !important; }
+.th-svg .map_border { stroke: #2DD4EE !important; stroke-opacity: .35 !important; }
+.th-svg .misc, .th-svg .chopper, .th-svg .plane { fill: #2B3541 !important; }
+.th-svg .shadow { filter: none !important; }
+
+/* выбранный этаж здания — свой оттенок, чтобы сразу было видно */
+.th-svg .th-active .floor { fill: #17465A !important; stroke: #67E8F9 !important; stroke-opacity: .95 !important; stroke-width: .8px !important; }
+.th-svg .th-active .building { fill: #133A4B !important; stroke: #67E8F9 !important; stroke-opacity: .9 !important; }
+.th-svg .th-active .locked { fill: #3D2230 !important; stroke: #F87171 !important; stroke-opacity: .9 !important; }
+/* под выбранным этажом основа затемняется */
+.th-svg .th-dim-shape * { fill: #03060A !important; fill-opacity: .72 !important; stroke: none !important; }
+
+/* здания: точный контур при наведении */
+.th-svg { pointer-events: none; }
+.th-svg .th-bld * { fill: transparent !important; stroke: transparent !important; pointer-events: all; cursor: pointer; vector-effect: non-scaling-stroke; }
+.th-svg .th-bld.hover * { fill: rgba(45, 212, 238, .08) !important; stroke: #2DD4EE !important; stroke-width: 1.5px !important; stroke-dasharray: 4 3; }
+.th-svg .th-bld.active * { stroke: #F2B544 !important; stroke-width: 1.5px !important; stroke-dasharray: none; }
+.th-svg .th-bld.active.hover * { fill: rgba(242, 181, 68, .08) !important; }
+
+/* плитки там, где вектора нет (Лабиринт, Ледокол), — приглушены под общую тему */
+.leaflet-tile-pane .th-tiles { filter: saturate(.35) brightness(.78) contrast(1.08); }
+.leaflet-tile-pane .th-sat { filter: saturate(.75) brightness(.9); }
+
+/* плашка этажа на здании */
+.fbadge { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
+  font: 700 11px "Cascadia Mono", Consolas, monospace; letter-spacing: .6px; text-transform: uppercase;
+  color: #F2B544; background: rgba(5, 9, 12, .9); border: 1px solid #F2B544; border-radius: 3px; padding: 1px 7px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .6); }
+
+/* зона, где засчитывается условие задания, — тонкий пунктир */
+path.qzone { pointer-events: none; }
+
+/* метка задания: круг с номером и значком типа условия */
+.mq { position: relative; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: #071116; border: 2px solid #2DD4EE; box-shadow: 0 0 0 3px rgba(45, 212, 238, .16), 0 2px 6px rgba(0, 0, 0, .7);
+  font: 700 11px "Cascadia Mono", Consolas, monospace; color: #E6EDF3; transition: transform .12s; }
+.mq b { line-height: 1; }
+.mq.tracked { border-color: #F2B544; box-shadow: 0 0 0 3px rgba(242, 181, 68, .2), 0 2px 6px rgba(0, 0, 0, .7); }
+.mq.done { border-color: #34D399; opacity: .55; }
+.mq.avail { width: 16px; height: 16px; border-color: #8B5CF6; border-style: dashed; font-size: 0; background: rgba(20, 10, 40, .85); }
+.mq.item { width: 18px; height: 18px; border-radius: 3px; transform: rotate(45deg); border-color: #FCD34D; font-size: 0; }
+.mq.item .mq-t { transform: rotate(-45deg); position: static; width: 10px; height: 10px; background: #FCD34D; border: 0; }
+.mq-t { position: absolute; right: -6px; top: -6px; width: 13px; height: 13px; border-radius: 50%; background: #2DD4EE; border: 1.5px solid #071116;
+  -webkit-mask: none; }
+.mq.tracked .mq-t { background: #F2B544; }
+.mq.done .mq-t { background: #34D399; }
+.mq.avail .mq-t { display: none; }
+.mq-t::after { content: ""; position: absolute; inset: 2px; background: #071116;
+  -webkit-mask: var(--g) center / contain no-repeat; mask: var(--g) center / contain no-repeat; }
+.mq.item .mq-t::after { inset: 0; }
+.t-visit { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5Z'/%3E%3C/svg%3E"); }
+.t-mark { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14.4,6L14,4H5V21H7V14H12.6L13,16H20V6H14.4Z'/%3E%3C/svg%3E"); }
+.t-plantItem, .t-plantQuestItem { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z'/%3E%3C/svg%3E"); }
+.t-findQuestItem, .t-findItem, .t-giveQuestItem, .t-giveItem { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3Z'/%3E%3C/svg%3E"); }
+.t-shoot { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13Z'/%3E%3C/svg%3E"); }
+.t-useItem, .t-extract, .t-experience, .t-buildWeapon { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,7V13H13V7H11M11,15V17H13V15H11Z'/%3E%3C/svg%3E"); }
+#map.hovering .mq:not(.hl) { opacity: .25; }
+.mq.hl, .mq.focus { animation: mqpop .9s ease 2; }
+@keyframes mqpop { 50% { transform: scale(1.4); } }
+.mq.item.hl, .mq.item.focus { animation: none; box-shadow: 0 0 0 5px rgba(252, 211, 77, .4); }
+
+/* переход: шестиугольник со встречными стрелками */
+.mk-tr { width: 24px; height: 24px; display: grid; place-items: center; background: #8B5CF6;
+  clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); transition: transform .12s; }
+.mk-tr::before { content: ""; position: absolute; inset: 2px; background: #170C2E; clip-path: inherit; }
+.mk-tr svg { width: 14px; height: 14px; fill: #DDD6FE; position: relative; }
+.mk-tr:hover { transform: scale(1.2); }
+
+/* спавны */
+.mk-sp { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; background: rgba(5, 10, 12, .85); border: 1.5px solid; opacity: .9; }
+.mk-sp svg { width: 11px; height: 11px; }
+.mk-sp.pmc { border-color: #2DD4EE; } .mk-sp.pmc svg { fill: #2DD4EE; }
+.mk-sp.scav { border-color: #F2B544; } .mk-sp.scav svg { fill: #F2B544; }

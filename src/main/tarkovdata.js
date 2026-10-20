@@ -8,7 +8,7 @@ const path = require('path');
 
 const BASE = 'https://json.tarkov.dev';
 const STALE_MS = 12 * 60 * 60 * 1000; // данные старше 12 часов обновляются в фоне (база ~20 МБ)
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 6;
 
 const TRANSLATE_KEYS = new Set(['name', 'shortName', 'description', 'exitName', 'targetNames', 'exitStatus',
   'effects', 'bodyParts', 'zoneName', 'Nickname', 'customizationTypeName']);
@@ -101,6 +101,13 @@ function buildMaps(raw, tr, enDict = {}) {
     transits: (m.transits || []).map((t) => ({ description: t.description, en: t._en, position: pos(t.position), top: t.top, bottom: t.bottom })),
     locks: (m.locks || []).filter((l) => l.key).map((l) => ({ key: l.key, lockType: l.lockType, needsPower: l.needsPower, position: pos(l.position) })),
     bosses: (m.bosses || []).map((b) => ({ name: b.name || b.boss, spawnChance: b.spawnChance })),
+    // точки появления игроков: ЧВК и Дикие (боты не нужны)
+    // у tarkov.dev старт ЧВК — категория только player (сторона pmc или all), зона Диких — scav + player вместе с ботами
+    spawns: (m.spawns || []).filter((s) => s.position && (s.categories || []).includes('player')).map((s) => {
+      const sides = s.sides || [], cats = s.categories || [];
+      const side = sides.includes('scav') ? 'scav' : (sides.includes('pmc') || sides.includes('all')) && !cats.some((c) => c.startsWith('bot')) ? 'pmc' : null;
+      return side && { side, position: pos(s.position) };
+    }).filter(Boolean),
     accessKeys: m.accessKeys || [],
   }));
 }

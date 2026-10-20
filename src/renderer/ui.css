@@ -605,3 +605,40 @@ body.compact .dock-fold { display: none; }
 
 /* подсказки и окна карты — поверх плавающих панелей */
 .leaflet-tooltip-pane, .leaflet-popup-pane { z-index: 820; }
+
+/* ---------- v1.4 ---------- */
+.ic-refresh { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z'/%3E%3C/svg%3E"); }
+.qlist-head .hbtn { width: 26px; height: 26px; }
+
+/* «следовать за игрой» — переключатель в стиле приложения */
+.switch.follow { height: 24px; padding: 0 9px 0 6px; background: var(--glass); border: 1px solid var(--line); border-radius: 3px; font-size: 12px; gap: 7px; }
+.switch.follow span { width: 26px; height: 14px; }
+.switch.follow span::after { width: 10px; height: 10px; }
+.switch.follow input:checked + span::after { left: 14px; }
+
+/* прогресс квеста в списке досье */
+.qr-p { font: 700 11px var(--mono); color: var(--accent); background: var(--accent-soft); border: 1px solid rgba(45,212,238,.3); border-radius: 3px; padding: 1px 6px; flex: none; }
+.qr-p.full { color: var(--ok); background: rgba(52,211,153,.1); border-color: rgba(52,211,153,.35); }
+.qrow .bar { display: none; }
+
+/* подсказки интерфейса */
+.uitip { position: fixed; z-index: 4000; pointer-events: none; max-width: 320px; background: #0B1117; color: var(--text); border: 1px solid var(--line2);
+  border-left: 2px solid var(--accent); border-radius: 3px; padding: 5px 9px; font-size: 12px; line-height: 1.4; box-shadow: 0 8px 24px rgba(0,0,0,.55); white-space: pre-line; }
+.map-hint { white-space: pre-line; line-height: 1.45; }
+
+/* подпись разработчика */
+a.map-credit { pointer-events: auto; color: var(--faint); font: 600 10.5px var(--mono); letter-spacing: .5px; text-decoration: none; }
+a.map-credit b { color: var(--accent); }
+a.map-credit:hover { color: var(--text); }
+.about { display: flex; gap: 12px; align-items: center; color: var(--dim); }
+.about b { color: var(--text); }
+
+/* адаптивная верхняя панель: кнопки окна никогда не обрезаются */
+.bar { overflow: hidden; }
+.bar .tools { flex: none; margin-left: auto; }
+.ws { flex: 0 1 auto; min-width: 0; }
+.telemetry { flex: 0 1 auto; min-width: 60px; }
+@media (max-width: 1320px) { .wordmark { display: none; } .tl-sub { display: none; } }
+@media (max-width: 1120px) { .ws button span { display: none; } .ws button { padding: 0 10px; } .omni { min-width: 0; } .omni span, .omni kbd { display: none; } }
+@media (max-width: 860px) { .telemetry .tl-main { display: none; } .telemetry { min-width: 0; padding: 0 8px; } .tools .sep, #btnHelp { display: none; } .tool { width: 32px; } .win { width: 38px; } }
+@media (max-width: 700px) { #btnPin, #btnSettings { display: none; } .omni { display: none; } .bar { gap: 6px; padding-left: 8px; } }

@@ -6,6 +6,7 @@
   <title>Tarkov Helper</title>
   <link rel="stylesheet" href="../../node_modules/leaflet/dist/leaflet.css">
   <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="map-theme.css">
 </head>
 <body>
   <!-- ============ Командная строка ============ -->
@@ -52,13 +53,15 @@
       <div class="hud hud-maps" id="mapStrip" aria-label="Карты"></div>
 
       <div class="hud hud-layers">
-        <label class="follow" title="Переключать карту, когда игра её загружает"><input type="checkbox" id="mapFollow" checked><span>следовать за игрой</span></label>
+        <label class="switch follow" title="Переключать карту и выходы ЧВК/Диких, когда игра загружает рейд"><input type="checkbox" id="mapFollow" checked><span></span>следовать за игрой</label>
         <div class="chips" id="layerChips">
           <button data-layer="quests" class="chip on" title="Точки активных квестов">Задачи</button>
           <button data-layer="avail" class="chip" title="Точки квестов, которые можно взять">Можно взять</button>
           <button data-layer="pmc" class="chip on">Выходы ЧВК</button>
           <button data-layer="scav" class="chip">Выходы Диких</button>
           <button data-layer="transits" class="chip on">Переходы</button>
+          <button data-layer="spawnPmc" class="chip" title="Точки появления ЧВК">Спавн ЧВК</button>
+          <button data-layer="spawnScav" class="chip" title="Точки появления Диких">Спавн Диких</button>
           <button data-layer="locks" class="chip" title="Все запертые двери">Двери</button>
           <button data-layer="labels" class="chip on">Подписи</button>
         </div>
@@ -93,7 +96,7 @@
         <button class="hbtn" id="btnFit" title="Вся карта"><i class="ic ic-fit"></i></button>
         <button class="hbtn" id="btnMe" title="Моя позиция (по скриншоту)"><i class="ic ic-me"></i></button>
       </div>
-      <div class="map-credit" id="mapCredit"></div>
+      <a class="map-credit" id="mapCredit" href="https://github.com/Naki-404" data-ext title="GitHub разработчика">made by <b>NakiDev</b></a>
     </section>
 
     <!-- ============ ДОСЬЕ: фильтры | список | карточка ============ -->
@@ -117,6 +120,7 @@
         </aside>
         <div class="qlist-wrap">
           <div class="qlist-head"><b id="qListTitle">Активные</b><span id="qListCount"></span>
+            <button class="hbtn" id="qRefresh" title="Обновить базу квестов (tarkov.dev) — подтянуть новые и убрать удалённые"><i class="ic ic-refresh"></i></button>
             <select id="qSort" class="field sm"><option value="trader">по торговцу</option><option value="level">по уровню</option><option value="map">по карте</option><option value="progress">по прогрессу</option></select></div>
           <div class="qlist" id="qList"></div>
         </div>
@@ -232,10 +236,20 @@
         <div class="panel-title mt">Данные</div>
         <div class="kv"><span>Язык базы</span><select id="sLang" class="field"><option value="ru">Русский</option><option value="en">English</option></select></div>
         <div class="kv"><span>Режим (квесты и цены)</span><select id="sMode" class="field"><option value="auto">Авто по логам</option><option value="pve">PvE</option><option value="regular">PvP</option></select></div>
+        <div class="btnrow"><button class="btn" id="sRefresh" title="Новые и удалённые квесты, цены, выходы">Обновить базу квестов</button><button class="btn" id="sClearWiki" title="Заново скачать фото мест и выходов">Обновить фото с вики</button></div>
+        <div class="kv"><span>База tarkov.dev</span><b id="sDataInfo">—</b></div>
+
+        <div class="panel-title mt">Статистика</div>
+        <p class="note">Квесты из логов, ручные отметки, счётчики, закреплённые, уровни убежища и собранные предметы текущего профиля.</p>
+        <div class="btnrow"><button class="btn" id="sRescan">Пересканировать логи</button><button class="btn danger" id="sResetAll">Сбросить статистику</button></div>
 
         <div class="panel-title mt">Безопасность</div>
         <p class="note">Игра не трогается: память не читается, код не внедряется, трафик не перехватывается. Источники — текстовые логи игры, открытая база tarkov.dev и скриншоты квестов с вики (escapefromtarkov.fandom.com, CC BY-SA). Окно — обычное окно Windows; в игре нужен режим «Оконный без рамки».</p>
         <div class="btnrow"><button class="btn" id="sHelp">Показать подсказки первого запуска</button></div>
+
+        <div class="panel-title mt">О программе</div>
+        <div class="about"><span class="glyph"></span><div><b>Tarkov Helper</b> <span id="sVersion"></span><br>Made by <a href="https://github.com/Naki-404" data-ext>NakiDev</a> · <a href="https://github.com/Naki-404/tarkov-helper" data-ext>исходный код</a></div></div>
+        <p class="note">Данные: tarkov.dev (MIT) · векторные карты — tarkov-dev-svg-maps (CC BY-NC-SA 4.0) · фото мест — Escape from Tarkov Wiki (CC BY-SA).</p>
       </div>
     </div>
   </div>
