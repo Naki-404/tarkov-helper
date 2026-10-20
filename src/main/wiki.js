@@ -40,6 +40,27 @@ function isMapImage(img) {
   return MAP_CAPTION.test(img.caption || '') || MAP_FILE.test(file.split('/').pop() || '');
 }
 
+// К какой карте относится скриншот — по английскому названию карты в подписи или имени файла.
+// Квест с условиями на разных картах («Тарковский мясник»: найти на Эпицентре, заложить на Улицах) иначе
+// показывал бы на Улицах фото грузовика с Эпицентра. Ключи — как keyOfMap() в renderer/app.js.
+const MAP_KEYS = [
+  ['ground-zero', /\bground[ _-]?zero\b|\bsandbox\b/i], ['streets', /\bstreets\b/i], ['customs', /\bcustoms\b/i], ['woods', /\bwoods\b/i],
+  ['shoreline', /\bshoreline\b/i], ['interchange', /\binterchange\b/i], ['reserve', /\breserve\b|\brezerv\b/i], ['lighthouse', /\blighthouse\b/i],
+  ['factory', /\bfactory\b/i], ['labs', /\blabs?\b|\blaboratory\b/i], ['labyrinth', /\blabyrinth\b/i], ['terminal', /\bterminal\b/i], ['icebreaker', /\bicebreaker\b/i],
+];
+function mapOfImage(img) {
+  const file = decodeURIComponent((img.full || '').split('/images/')[1]?.split('/revision')[0] || '').split('/').pop() || '';
+  const s = `${img.caption || ''} ${file.replace(/[_-]+/g, ' ')}`.replace(/hipster reserve/gi, ''); // очки RayBench Hipster Reserve — не карта
+  for (const [key, re] of MAP_KEYS) if (re.test(s)) return key;
+  return null;
+}
+// картинки идут по порядку условий: без названия карты — та же, что у предыдущей (в т.ч. у отброшенной карты-обводки)
+function tagMaps(list) {
+  let cur = null;
+  for (const im of list) { cur = mapOfImage(im) || cur; im.map = cur; }
+  return list;
+}
+
 function parse(html) {
   const sec = guideSection(html);
   const images = [];
@@ -47,7 +68,6 @@ function parse(html) {
   const push = (full, thumb, caption) => {
     if (!IMG_HOST.test(full || '') || seen.has(full)) return;
     if (/Icon\.(png|jpg|webp)/i.test(full)) return; // иконки предметов из таблицы — не скриншоты
-    if (isMapImage({ full, caption: text(caption || '') })) return;
     seen.add(full);
     images.push({ full, thumb: IMG_HOST.test(thumb || '') ? thumb : full, caption: text(caption || '') });
   };
@@ -68,7 +88,8 @@ function parse(html) {
   const paras = [...sec.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m) => text(m[1])).filter((t) => t.length > 20);
   let guide = paras.join('\n\n');
   if (guide.length > 1400) guide = guide.slice(0, 1400).replace(/\s+\S*$/, '') + '…';
-  return { images: images.slice(0, 30), guide };
+  // карта с обводкой — не то, что нужно: место уже отмечено точкой на нашей карте
+  return { images: tagMaps(images).filter((i) => !isMapImage(i)).slice(0, 30), guide };
 }
 
 // Страница карты: таблицы «Extractions» и «Transits» — скриншот выхода, фракция, требования, примечания.
@@ -109,32 +130,41 @@ class Wiki {
   cached(id) {
     try {
       const d = JSON.parse(fs.readFileSync(this.file(id), 'utf8'));
-      // кэш прошлых версий мог содержать карты — отфильтровываем и при чтении
-      return { ...d, images: (d.images || []).filter((i) => !isMapImage(i)), stale: !(Date.now() - d.ts < TTL) };
+      // кэш прошлых версий мог содержать карты-обводки и не знать карту скриншота — чиним при чтении
+      const images = (d.images || []).some((i) => 'map' in i) ? d.images : tagMaps(d.images || []);
+      return { ...d, images: images.filter((i) => !isMapImage(i)), stale: !(Date.now() - d.ts < TTL) };
     } catch { return null; }
   }
 
   // скриншоты выходов и переходов карты (страница карты на вики)
-  async getMap(map) {
+  getMap(map) {
     const f = path.join(this.dir, 'map-' + map.id + '.json');
     try {
       const d = JSON.parse(fs.readFileSync(f, 'utf8'));
-      if (Date.now() - d.ts < TTL) return d;
+      if (Date.now() - d.ts < TTL) return Promise.resolve(d);
     } catch { /* нет кэша */ }
-    const title = pageTitle(map.wiki);
-    if (!title) return { id: map.id, extracts: [], transits: [] };
-    try {
-      const url = `${API}?action=parse&page=${encodeURIComponent(title)}&prop=text&redirects=1&format=json&formatversion=2`;
-      const res = await fetch(url, { headers: { 'User-Agent': UA } });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const j = await res.json();
-      const d = { id: map.id, url: map.wiki, ...parseMapPage(j?.parse?.text || ''), ts: Date.now() };
-      fs.mkdirSync(this.dir, { recursive: true });
-      fs.writeFileSync(f, JSON.stringify(d));
-      return d;
-    } catch (e) {
-      try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return { id: map.id, extracts: [], transits: [], error: e.message }; }
-    }
+    const key = 'map-' + map.id;
+    if (this.inflight.has(key)) return this.inflight.get(key); // одна загрузка на карту, сколько бы раз ни спросили
+    const p = (async () => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 20000);
+      try {
+        const title = pageTitle(map.wiki);
+        if (!title) return { id: map.id, extracts: [], transits: [] };
+        const url = `${API}?action=parse&page=${encodeURIComponent(title)}&prop=text&redirects=1&format=json&formatversion=2`;
+        const res = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const j = await res.json();
+        const d = { id: map.id, url: map.wiki, ...parseMapPage(j?.parse?.text || ''), ts: Date.now() };
+        fs.mkdirSync(this.dir, { recursive: true });
+        fs.writeFileSync(f, JSON.stringify(d));
+        return d;
+      } catch (e) {
+        try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return { id: map.id, extracts: [], transits: [], error: e.message }; }
+      } finally { clearTimeout(timer); this.inflight.delete(key); }
+    })();
+    this.inflight.set(key, p);
+    return p;
   }
 
   // task: { id, wikiLink }
@@ -183,4 +213,4 @@ class Wiki {
   }
 }
 
-module.exports = { Wiki, parse, parseMapPage, isMapImage, pageTitle };
+module.exports = { Wiki, parse, parseMapPage, isMapImage, pageTitle, mapOfImage };

@@ -29,6 +29,15 @@
 .th-svg .th-active .locked { fill: #3D2230 !important; stroke: #F87171 !important; stroke-opacity: .9 !important; }
 /* под выбранным этажом основа затемняется */
 .th-svg .th-dim-shape * { fill: #03060A !important; fill-opacity: .72 !important; stroke: none !important; }
+/* этаж на всю карту: основа приглушена, чтобы читались коридоры и стены выбранного этажа */
+.th-svg .base-layer.th-off { opacity: .3; filter: grayscale(.5) brightness(.75); }
+
+/* Лаборатория: фигуры размечены классами по исходным цветам (assets/maps/Labs.svg) */
+.th-svg .floor.dark { fill: #162029 !important; }
+.th-svg .th-active .floor.dark { fill: #113645 !important; }
+.th-svg .door { fill: #F2B544 !important; fill-opacity: .8 !important; }
+.th-svg .line { fill: none !important; stroke: #3B4A58 !important; stroke-width: .8px !important; }
+.th-svg .line.dashed { stroke-dasharray: 3 2; stroke: #67E8F9 !important; stroke-opacity: .5 !important; }
 
 /* здания: точный контур при наведении */
 .th-svg { pointer-events: none; }

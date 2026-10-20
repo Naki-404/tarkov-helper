@@ -1,4 +1,4 @@
-import { TarkovMap } from './map.js';
+import { TarkovMap, ICON } from './map.js';
 import {
   S, idx, idOf, MONEY, ST_LABEL, RAID_LABEL, indexData, item, trader, statusOf, statusInfo, isTracked, objCount, objProgress, objDone, taskPct,
   mapByLogId, defFor, selectableMaps, sameMapIds, taskOnMap, objOnMap, objHere, mapNames, hasMapPoints, byTrader, objText, objItems, prereqChain,
@@ -25,7 +25,7 @@ const openTasks = new Set(); // раскрытые задачи в панели 
 
 const tmap = new TarkovMap($('#map'), api);
 tmap.onError = (msg) => toast(msg);
-tmap.shotsFor = (taskId) => S.wiki.get(taskId)?.images || [];
+tmap.shotsFor = (taskId) => shotsOn(taskId, ui.raidMap);
 // выходы и переходы: фото и требования со страницы карты на вики (сопоставление по английскому названию)
 const mapWiki = new Map();
 const normName = (s) => String(s || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -41,14 +41,17 @@ tmap.onExitClick = (item, kind) => {
   const media = tmap.exitMedia(item, kind);
   if (media?.images?.length) openGallery(media.images.map((im) => ({ ...im, caption: kind === 'transit' ? item.description : item.name })));
 };
-// здания найдены — этажи переключаются кликом по зданию, кнопки этажей не нужны
+// кнопки этажей — этаж на всю карту; на схеме этаж одного здания выбирается ещё и кликом по нему
 tmap.onBuildings = (n) => updateFloorUi(n);
 function updateFloorUi(nBuildings) {
   const floors = tmap.floors();
   const byClick = nBuildings > 0 && tmap.style === 'svg';
-  setHtml($('#floorSeg'), byClick ? '<span class="floor-hint">этажи — клик по зданию</span>'
-    : floors.length ? '<button data-floor="" class="on">Все этажи</button>' + floors.map((f) => `<button data-floor="${esc(f)}">${esc(floorName(f))}</button>`).join('') : '');
+  setHtml($('#floorSeg'), floors.length ? '<button data-floor="">Все этажи</button>' + floors.map((f) => `<button data-floor="${esc(f)}">${esc(floorName(f))}</button>`).join('') : '');
+  $('#floorSeg').dataset.tip = byClick ? 'Этаж всей карты. Этаж одного здания — клик по нему, правый клик — этажом ниже' : 'Этаж всей карты';
+  syncFloorButtons();
 }
+function syncFloorButtons() { $$('#floorSeg button').forEach((x) => x.classList.toggle('on', x.dataset.floor === (tmap.floor || ''))); }
+tmap.onFloor = syncFloorButtons;
 let loadedMapId = null;
 let pointsSig = '';
 let locksSig = '';
@@ -201,9 +204,13 @@ document.addEventListener('mousedown', () => tip.classList.add('hidden'));
 let ctHover = false;
 document.addEventListener('mousemove', (e) => {
   if (!S.state?.clickThrough) { ctHover = false; return; }
-  const over = !!e.target.closest?.('.bar');
+  const over = !!e.target.closest?.('header.bar');
   if (over !== ctHover) { ctHover = over; api.win(over ? 'ctHover-on' : 'ctHover-off'); }
 });
+// курсор ушёл за край окна или окно потеряло фокус — снова пропускаем клики в игру
+const ctRelease = () => { if (ctHover) { ctHover = false; api.win('ctHover-off'); } };
+document.addEventListener('mouseleave', ctRelease);
+window.addEventListener('blur', ctRelease);
 
 // ---------------------------------------------------------------- скриншоты с вики
 const wikiWanted = new Set();
@@ -216,9 +223,25 @@ function wantWiki(ids) {
 const renderSoon = debounce(() => render(), 120);
 api.onWiki((d) => { if (d?.id) { S.wiki.set(d.id, d); wikiWanted.delete(d.id); renderSoon(); } });
 const shots = (taskId) => S.wiki.get(taskId)?.images || [];
-function camBtn(taskId) {
-  const n = shots(taskId).length;
-  return `<button class="ibtn cam${n ? '' : ' none'}" data-act="shots" data-id="${taskId}" data-peek="${taskId}" title="Скриншоты места (${n})"><i class="ic ic-cam"></i>${n > 1 ? `<b>${n}</b>` : ''}</button>`;
+// ключ карты без вариантов (Эпицентр / Эпицентр 21+, Завод / Ночной Завод) — как MAP_KEYS в main/wiki.js
+const MAP_KEY = { bigmap: 'customs', woods: 'woods', shoreline: 'shoreline', interchange: 'interchange', rezervbase: 'reserve', lighthouse: 'lighthouse', factory4_day: 'factory', factory4_night: 'factory',
+  laboratory: 'labs', laboratory_dark: 'labs', tarkovstreets: 'streets', sandbox: 'ground-zero', sandbox_high: 'ground-zero', sandbox_start: 'ground-zero', labyrinth: 'labyrinth', terminal: 'terminal', icebreaker: 'icebreaker' };
+const keyOfMap = (mapId) => MAP_KEY[(idx.map.get(mapId)?.nameId || '').toLowerCase()] || null;
+const keyName = (key) => (S.data.maps.find((m) => keyOfMap(m.id) === key)?.name || key).replace(/\s*21\+$/, '');
+const taskMapKeys = (t) => new Set([...(t.map ? [t.map] : []), ...t.objectives.flatMap((o) => o.maps || [])].map(keyOfMap).filter(Boolean));
+// фото квеста для конкретной карты: если условия на разных картах — только снимки этой карты (и без привязки)
+function shotsOn(taskId, mapId) {
+  const all = shots(taskId);
+  const t = idx.task.get(taskId);
+  if (!t || !mapId) return all;
+  const keys = taskMapKeys(t);
+  if (keys.size < 2) return all;
+  const k = keyOfMap(mapId);
+  return all.filter((im) => !im.map || !keys.has(im.map) || im.map === k);
+}
+function camBtn(taskId, mapId) {
+  const n = shotsOn(taskId, mapId).length;
+  return `<button class="ibtn cam${n ? '' : ' none'}" data-act="shots" data-id="${taskId}" data-map="${mapId || ''}" data-peek="${taskId}" title="Скриншоты места (${n})"><i class="ic ic-cam"></i>${n > 1 ? `<b>${n}</b>` : ''}</button>`;
 }
 
 // превью при наведении
@@ -226,7 +249,7 @@ const peek = $('#peek');
 document.addEventListener('mouseover', (e) => {
   const el = e.target.closest('[data-peek],[data-peekimg]');
   if (!el) { peek.classList.add('hidden'); return; }
-  const img = el.dataset.peekimg ? { thumb: el.dataset.peekimg, caption: el.dataset.peekcap } : shots(el.dataset.peek)[Number(el.dataset.i || 0)];
+  const img = el.dataset.peekimg ? { thumb: el.dataset.peekimg, caption: el.dataset.peekcap } : shotsOn(el.dataset.peek, el.dataset.map)[Number(el.dataset.i || 0)];
   if (!img) return;
   $('#peekImg').src = img.thumb;
   $('#peekCap').textContent = img.caption || '';
@@ -242,8 +265,8 @@ document.addEventListener('mouseleave', () => peek.classList.add('hidden'));
 
 // просмотр во весь экран: фото места квеста или фото выхода
 let lb = { list: [], i: 0 };
-function openLightbox(taskId, i = 0) {
-  const list = shots(taskId);
+function openLightbox(taskId, i = 0, mapId = null) {
+  const list = shotsOn(taskId, mapId);
   if (!list.length) { toast(S.wiki.has(taskId) ? 'На вики нет фото места для этого квеста — только карта' : 'Фото ещё загружаются с вики'); return; }
   openGallery(list, i);
 }
@@ -299,14 +322,20 @@ document.addEventListener('click', async (e) => {
   if (act === 'obj') await api.toggleObjective(el.dataset.obj, el.dataset.done !== '1');
   if (act === 'cnt') {
     const cur = S.state.profile.counters?.[el.dataset.obj] || 0;
-    await api.setCounter(el.dataset.obj, Math.max(0, Math.min(Number(el.dataset.max) || Infinity, cur + Number(el.dataset.d))));
+    const next = Math.max(0, Math.min(Number(el.dataset.max) || Infinity, cur + Number(el.dataset.d)));
+    (S.state.profile.counters ||= {})[el.dataset.obj] = next; // сразу и локально: быстрые клики не теряются, пока main отвечает
+    await api.setCounter(el.dataset.obj, next);
   }
   if (act === 'status') { await api.setManual(el.dataset.task, el.dataset.st || null); if (el.dataset.st === 'complete') toast('Квест отмечен выполненным'); }
   if (act === 'chain') { const list = prereqChain(el.dataset.task); await api.setManualMany(list, 'complete'); toast(list.length ? `Отмечено выполненными: ${list.length}` : 'Предыдущих невыполненных квестов нет'); }
   if (act === 'focus') focusObjective(el.dataset.task, el.dataset.obj);
-  if (act === 'shots') openLightbox(el.dataset.id, Number(el.dataset.i || 0));
+  if (act === 'shots') openLightbox(el.dataset.id, Number(el.dataset.i || 0), el.dataset.map || null);
   if (act === 'dossier') { ui.qSel = el.dataset.task; ui.qStatus = 'all'; saveUi(); setView('dossier'); }
-  if (act === 'own') await api.setOwned(el.dataset.id, el.dataset.set != null ? Number(el.dataset.set) : Math.max(0, owned(el.dataset.id) + Number(el.dataset.d)));
+  if (act === 'own') {
+    const n = el.dataset.set != null ? Number(el.dataset.set) : Math.max(0, owned(el.dataset.id) + Number(el.dataset.d));
+    (S.state.profile.owned ||= {})[el.dataset.id] = n;
+    await api.setOwned(el.dataset.id, n);
+  }
   if (act === 'hlvl') await api.setHideout(el.dataset.station, Number(el.dataset.lvl));
 });
 
@@ -456,7 +485,7 @@ function taskRow(t, opt) {
       <span class="tnum${opt.n ? '' : ' none'}">${opt.n || '·'}</span>
       <div class="task-t"><div class="task-n">${esc(t.name)}</div><div class="task-m"><img src="${esc(tr.imageLink)}" alt="" loading="lazy">${esc(tr.name)} · ${esc(maps.slice(0, 2).join(', ') || 'любая карта')}${t.minPlayerLevel > 1 ? ` · ур. ${t.minPlayerLevel}` : ''}</div></div>
       ${st === 'active' && objs.length ? `<span class="task-p">${done}/${objs.length}</span>` : ''}
-      ${camBtn(t.id)}
+      ${camBtn(t.id, ui.raidMap)}
       <button class="ibtn star${tracked ? ' on' : ''}" data-act="track" data-task="${t.id}" title="${tracked ? 'Открепить' : 'Закрепить наверху'}">★</button>
       <button class="ibtn" data-act="dossier" data-task="${t.id}" title="Открыть в досье"><i class="ic ic-dossier" style="width:13px;height:13px"></i></button>
     </div>${body}</div>`;
@@ -503,7 +532,6 @@ $('#mapFollow').addEventListener('change', (e) => {
 $('#floorSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-floor]'); if (!b) return;
   tmap.setFloor(b.dataset.floor);
-  $$('#floorSeg button').forEach((x) => x.classList.toggle('on', x === b));
 });
 $$('#styleSeg button').forEach((b) => b.addEventListener('click', () => {
   localStorage.setItem('mapStyle', b.dataset.style);
@@ -523,6 +551,32 @@ $$('#layerChips .chip').forEach((b) => {
   });
 });
 $('#btnFit').addEventListener('click', () => tmap.fit());
+// легенда: те же разметка и стили, что у значков на карте
+const legendHtml = () => {
+  const row = (icon, text) => `<div class="lgr"><i class="box">${icon}</i><span>${text}</span></div>`;
+  return `<h4>Значки на карте</h4><div class="lg-grid">
+    ${row('<div class="mq"><b>3</b><i class="mq-t t-visit"></i></div>', 'Условие активного квеста, номер — как в списке задач; кружок — тип условия')}
+    ${row('<div class="mq tracked"><b>1</b><i class="mq-t t-findQuestItem"></i></div>', 'Закреплённый квест (★)')}
+    ${row('<div class="mq done"><b>2</b></div>', 'Условие выполнено')}
+    ${row('<div class="mq avail"></div>', 'Квест можно взять — его точка на этой карте')}
+    ${row('<div class="mq item"><i class="mq-t"></i></div>', 'Предмет или место закладки')}
+    ${row('<span class="lg-zone"></span>', 'Зона, где засчитывается условие')}
+    ${row(`<div class="mk-x pmc">${ICON.exit}</div>`, 'Выход ЧВК')}
+    ${row(`<div class="mk-x scav">${ICON.exit}</div>`, 'Выход Диких')}
+    ${row(`<div class="mk-x shared">${ICON.exit}</div>`, 'Общий выход')}
+    ${row(`<div class="mk-tr">${ICON.transit}</div>`, 'Переход на другую карту')}
+    ${row(`<div class="mk-sp pmc">${ICON.spawn}</div>`, 'Спавн ЧВК (Диких — янтарный)')}
+    ${row(`<div class="mk-lock need">${ICON.lock}</div>`, 'Дверь с ключом; подсвечена — ключ нужен для квеста')}
+    ${row('<span class="lg-floor"></span>', 'Выбранный этаж')}
+    ${row('<span class="lg-dim"></span>', 'Другие этажи приглушены')}
+  </div><div class="lg-foot">Наведи на значок — подсказка с фото; клик по зданию — этаж выше, правый клик — ниже.</div>`;
+};
+$('#btnLegend').addEventListener('click', () => {
+  const lg = $('#legend');
+  if (lg.classList.contains('hidden')) lg.innerHTML = legendHtml();
+  lg.classList.toggle('hidden');
+});
+document.addEventListener('mousedown', (e) => { if (!e.target.closest('#legend, #btnLegend')) $('#legend').classList.add('hidden'); });
 $('#btnMe').addEventListener('click', () => {
   if (tmap.me) tmap.focusPoint(tmap.me);
   else toast(S.state?.settings?.screenshotsEnabled ? 'Сделай скриншот в игре (Print Screen) — позиция появится на карте' : 'Включи «Позиция по скриншотам» в настройках');
@@ -551,7 +605,7 @@ function focusObjective(taskId, objId) {
 tmap.onPopupAction = async (d) => {
   if (d.act === 'toggleObj') { await api.toggleObjective(d.id, !S.state.profile.objectives[d.id]); tmap.map?.closePopup(); }
   if (d.act === 'openTask') { ui.qSel = d.id; ui.qStatus = 'all'; saveUi(); setView('dossier'); }
-  if (d.act === 'shots') openLightbox(d.id, 0);
+  if (d.act === 'shots') openLightbox(d.id, 0, ui.raidMap);
 };
 
 // ---------------------------------------------------------------- ДОСЬЕ
@@ -634,8 +688,9 @@ function renderQuestDetail(t) {
   if (t.experience) rew.push(`<span class="tag">${fmt(t.experience)} опыта</span>`);
   for (const r of t.finishRewards?.items || []) { const it = item(r.item); rew.push(`<span class="oitem"><img src="${esc(it.i || '')}" alt="" loading="lazy">${esc(it.s || it.n)} ×${fmt(r.count)}</span>`); }
   const src = info.src === 'log' ? 'статус — по логам игры' : info.src === 'manual' ? 'статус отмечен вручную' : info.src === 'implied' ? 'выполнен по цепочке' : '';
+  const multi = taskMapKeys(t).size > 1; // условия на разных картах — подписываем, с какой карты снимок
   const gallery = w?.images?.length
-    ? `<div class="gallery">${w.images.map((im, i) => `<div class="shot" data-act="shots" data-id="${t.id}" data-i="${i}" title="${esc(im.caption)}"><img src="${esc(im.thumb)}" alt="" loading="lazy"><span>${esc(im.caption)}</span></div>`).join('')}</div>`
+    ? `<div class="gallery">${w.images.map((im, i) => `<div class="shot" data-act="shots" data-id="${t.id}" data-i="${i}" title="${esc(im.caption)}"><img src="${esc(im.thumb)}" alt="" loading="lazy"><span>${multi && im.map ? `<b>${esc(keyName(im.map))}</b> · ` : ''}${esc(im.caption)}</span></div>`).join('')}</div>`
     : `<div class="note">${!t.wikiLink ? 'У квеста нет страницы на вики.' : w ? 'На вики для этого квеста есть только карта — фото самого места нет. Точка уже отмечена на нашей карте.' : 'Загружаю фото места с вики…'}</div>`;
   setHtml($('#qDetail'), `
     <div class="dt-head"><img class="portrait" src="${esc(tr.imageLink)}" alt="">
@@ -799,7 +854,7 @@ function renderSummary() {
   setHtml($('#pTraders'), S.data.traders.map((t) => {
     let a = 0, d = 0;
     for (const x of S.data.tasks) if (x.trader === t.id) { a++; if (statusOf(x.id) === 'complete') d++; }
-    return a ? `<div class="trow" data-trader="${t.id}" title="Квесты торговца"><img src="${esc(t.imageLink)}" alt="" loading="lazy"><span>${esc(t.name)}</span><div class="bar"><i style="width:${Math.round((d / a) * 100)}%"></i></div><em>${d}/${a}</em></div>` : '';
+    return a ? `<div class="trow" data-trader="${t.id}" title="Квесты торговца"><img src="${esc(t.imageLink)}" alt="" loading="lazy"><span>${esc(t.name)}</span><div class="tbar"><i style="width:${Math.round((d / a) * 100)}%"></i></div><em>${d}/${a}</em></div>` : '';
   }).join(''));
   setHtml($('#journal'), S.events.length ? S.events.map((e) => `<div class="jrow"><time>${new Date(e.ts).toLocaleString('ru-RU')}</time><span>${esc(e.text)}</span></div>`).join('')
     : '<div class="empty">Пока пусто. Здесь появятся загрузки карт, рейды и квесты из логов.</div>');
@@ -857,10 +912,14 @@ $$('.hk').forEach((inp) => inp.addEventListener('keydown', (e) => {
   if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
   const parts = [];
   if (e.ctrlKey) parts.push('Ctrl'); if (e.altKey) parts.push('Alt'); if (e.shiftKey) parts.push('Shift');
-  let key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+  // имена клавиш — как в акселераторах Electron: Up вместо ArrowUp, Plus вместо +, num5 вместо Numpad5
+  let key = e.key.length === 1 ? e.key.toUpperCase() : e.key.replace(/^Arrow/, '');
   if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3);
   if (/^Digit\d$/.test(e.code)) key = e.code.slice(5);
+  if (/^Numpad\d$/.test(e.code)) key = 'num' + e.code.slice(6);
   if (key === ' ') key = 'Space';
+  if (key === '+') key = 'Plus';
+  if (key === 'Enter') key = 'Return';
   if (!parts.length && !/^F\d+$/.test(key)) { toast('Добавь Ctrl, Alt или Shift — одиночная клавиша мешала бы в игре'); return; }
   parts.push(key);
   inp.value = parts.join('+');
@@ -934,7 +993,8 @@ $('#obSettings').addEventListener('click', () => { closeOnboarding(); openSettin
 function setCompact(on) {
   ui.compact = on;
   document.body.classList.toggle('compact', on);
-  if (!on) loadedMapId = null;
+  if (on) tmap.destroy(); // в компактной панели карты нет — не держим её в памяти; при выходе она строится заново
+  loadedMapId = null;
   render();
   setTimeout(() => tmap.map?.invalidateSize(), 60);
 }
@@ -977,6 +1037,7 @@ api.onDebugSide((x) => {
   closeOnboarding();
   if (x === 'palette') openPalette();
   if (x === 'settings') openSettings();
+  if (x === 'legend') $('#btnLegend').click();
   if (x === 'sbottom') { openSettings(); const sc = [...$('#settings').querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 20 && getComputedStyle(e).overflowY !== 'visible'); if (sc) sc.scrollTop = 1e5; }
   if (x === 'spawns') for (const k of ['spawnPmc', 'spawnScav']) { $(`#layerChips [data-layer="${k}"]`)?.classList.add('on'); tmap.setLayer(k, true); }
   if (x?.startsWith('go:')) { const mm = mapByLogId(x.slice(3)); if (mm) { ui.raidMap = mm.id; ui.follow = false; render(); } }
@@ -996,6 +1057,7 @@ api.onDebugSide((x) => {
     }
     console.log('buildings', tmap.buildings.length, 'max', Math.max(0, ...tmap.buildings.map((y) => y.levels.length)), (b && b.name) || '');
   }, tmap.buildings.length ? 0 : 2500);
+  if (x?.startsWith('floor:')) setTimeout(() => tmap.setFloor(x.slice(6)), tmap.buildings.length ? 0 : 2500);
   if (x?.startsWith('zoom')) { const z = Number(x.slice(4)) || 2; const mk = [...tmap.questMarkers.values()][0]?.[0]; tmap.map?.setView(mk ? mk.getLatLng() : tmap.map.getCenter(), tmap.map.getZoom() + z, { animate: false }); }
   if (x?.startsWith('lb:')) { const t = S.data.tasks.find((y) => y.name === x.slice(3)); if (t) api.getWiki(t.id).then((d) => { S.wiki.set(t.id, d); openLightbox(t.id); }); }
   if (x?.startsWith('sel:')) { const t = S.data.tasks.find((y) => y.name === x.slice(4)); if (t) { ui.qSel = t.id; ui.qStatus = 'all'; render(); } }

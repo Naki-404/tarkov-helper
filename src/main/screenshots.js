@@ -25,11 +25,13 @@ function parseName(name) {
 class ScreenshotWatcher extends EventEmitter {
   constructor() { super(); this.timer = null; this.known = new Set(); this.dir = null; }
 
-  start(dir) {
+  // isActive: игра запущена; пока её нет, папку (бывают тысячи файлов) не перечитываем
+  start(dir, isActive = null) {
     this.stop();
     this.dir = dir;
+    this.isActive = isActive;
     this.known = new Set(this.list());
-    this.timer = setInterval(() => this.tick(), 1000);
+    this.timer = setInterval(() => { if (!this.isActive || this.isActive()) this.tick(); }, 1000);
   }
 
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }

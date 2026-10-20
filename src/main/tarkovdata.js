@@ -52,8 +52,9 @@ function makeTranslator(dict) {
 }
 
 const pick = (o, keys) => { const r = {}; for (const k of keys) if (o[k] !== undefined && o[k] !== null) r[k] = o[k]; return r; };
-const pos = (p) => (p ? { x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2) } : null);
-const zone = (z) => ({ map: z.map, position: pos(z.position), outline: z.outline?.map(pos), top: z.top, bottom: z.bottom });
+// неполная запись в базе (без координаты) не должна ронять всю загрузку
+const pos = (p) => (p && typeof p.x === 'number' && typeof p.z === 'number' ? { x: +p.x.toFixed(2), y: +(p.y || 0).toFixed(2), z: +p.z.toFixed(2) } : null);
+const zone = (z) => ({ map: z.map, position: pos(z.position), outline: (z.outline || []).map(pos).filter(Boolean), top: z.top, bottom: z.bottom });
 
 function buildTasks(raw, tr) {
   const tasks = Object.values(raw.tasks);
@@ -71,7 +72,7 @@ function buildTasks(raw, tr) {
         'targetNames', 'maps', 'level', 'trader', 'skill', 'task', 'status', 'item', 'markerItem', 'usingWeapon', 'wearing', 'requiredKeys',
         'dogTagLevel', 'minDurability']);
       if (o.zones?.length) r.zones = o.zones.map(zone);
-      if (o.possibleLocations?.length) r.possibleLocations = o.possibleLocations.map((l) => ({ map: l.map, positions: l.positions.map(pos) }));
+      if (o.possibleLocations?.length) r.possibleLocations = o.possibleLocations.map((l) => ({ map: l.map, positions: (l.positions || []).map(pos).filter(Boolean) }));
       if (o.questItem) {
         const q = typeof o.questItem === 'string' ? questItems[o.questItem] : o.questItem;
         r.questItem = q ? { id: q.id, name: q.name, shortName: q.shortName, iconLink: q.iconLink } : { id: o.questItem };

@@ -4,7 +4,7 @@
 /* global L */
 
 const SVGNS = 'http://www.w3.org/2000/svg';
-const ICON = {
+export const ICON = {
   lock: '<svg viewBox="0 0 24 24"><path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>',
   exit: '<svg viewBox="0 0 24 24"><path d="M13.34,8.17C12.41,8.17 11.65,7.4 11.65,6.47A1.69,1.69 0 0,1 13.34,4.78C14.28,4.78 15.04,5.54 15.04,6.47C15.04,7.4 14.28,8.17 13.34,8.17M10.3,19.93L4.37,18.75L4.71,17.05L8.86,17.9L10.21,11.04L8.69,11.64V14.5H7V10.54L11.4,8.67L12.07,8.59C12.67,8.59 13.17,8.93 13.5,9.44L14.36,10.79C15.04,12 16.39,12.82 18,12.82V14.5C16.14,14.5 14.44,13.67 13.34,12.4L12.84,14.94L14.61,16.63V23H12.92V17.9L11.14,16.21L10.3,19.93M21,23H19V3H6V16.82L4,16.4V1H21V23M6,23H4V19.85L6,20.27V23Z"/></svg>',
   // переход: две встречные стрелки
@@ -82,9 +82,12 @@ export class TarkovMap {
   destroy() {
     this.showHint(null);
     if (this.map) { this.map.remove(); this.map = null; }
+    // всё, что держит DOM (отсоединённый SVG, маркеры), отпускаем — иначе выгрузка карты ничего не освобождает
     this.buildings = [];
     this.bState.clear();
-    this.svgRoot = null;
+    this.svgRoot = null; this.svgEl = null; this.base = null; this.floorLayer = null; this.dimEl = null;
+    this.questMarkers?.clear?.(); this.taskMarkers?.clear?.();
+    this.hl = null;
   }
 
   load(def, mapData) {
@@ -158,13 +161,13 @@ export class TarkovMap {
         }
         requestAnimationFrame(() => { if (this.svgEl === svg) this.findBuildings(root); });
       }).catch(() => {
-        if (this.def !== def) return;
-        if (def.tilePath) this.setStyle('tile');
+        if (this.def !== def || this.svgEl !== svg) return; // уже переключились — ошибка старого запроса не считается
+        if (def.tilePath) { this.setStyle('tile'); this.onStyle?.('tile'); }
         else this.onError?.('Не удалось загрузить схему карты. Точки заданий и выходы всё равно показаны.');
       });
     }
     this.base.bringToBack?.();
-    if (!initial && this.floor && style === 'tile') this.setFloor(this.floor);
+    if (!initial && this.floor) this.setFloor(this.floor);
   }
 
   // ---------- здания ----------
@@ -234,7 +237,6 @@ export class TarkovMap {
       return n >= 3;
     };
     // след на земле связывает части одного здания, но не целый квартал, нарисованный одной фигурой
-    this._bigPrints = new Set();
     for (let p = 0; p < prints.length; p++) {
       const pi = floorRects.length + p;
       const hits = floorRects.map((r, i) => [r, i]).filter(([r]) => inter(prints[p], r) > 0.5 * area(r) && inside(prints[p], r));
@@ -242,7 +244,7 @@ export class TarkovMap {
       const hx1 = Math.min(...hits.map(([r]) => r.x1)), hy1 = Math.min(...hits.map(([r]) => r.y1));
       const hx2 = Math.max(...hits.map(([r]) => r.x2)), hy2 = Math.max(...hits.map(([r]) => r.y2));
       const covered = (hx2 - hx1) * (hy2 - hy1);
-      if (area(prints[p]) > 1.8 * covered) { this._bigPrints.add(prints[p]); continue; }
+      if (area(prints[p]) > 1.8 * covered) continue;
       for (const [, i] of hits) parent[find(pi)] = find(i);
     }
     const groups = new Map();
@@ -280,6 +282,7 @@ export class TarkovMap {
     root.appendChild(hot);
     this.dimEl = dim;
     this.onBuildings?.(this.buildings.length);
+    if (this.floor) this.setFloor(this.floor); // этаж, выбранный до загрузки схемы, — теперь вектором
   }
 
   // копии фигур контура в координатах корня SVG
@@ -297,13 +300,18 @@ export class TarkovMap {
     return g;
   }
 
+  // имя здания — самая крупная подпись внутри него, при равных — ближайшая к центру
   buildingName(rect) {
+    const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+    let best = null;
     for (const lb of this.def.labels || []) {
       if (!lb.position) continue;
       const s = this.toSvg({ x: lb.position[0], z: lb.position[1] });
-      if (s && s.x >= rect.x && s.x <= rect.x + rect.w && s.y >= rect.y && s.y <= rect.y + rect.h) return this.tr(lb.text);
+      if (!s || s.x < rect.x || s.x > rect.x + rect.w || s.y < rect.y || s.y > rect.y + rect.h) continue;
+      const score = (lb.size || 60) * 1e4 - Math.hypot(s.x - cx, s.y - cy);
+      if (!best || score > best.score) best = { score, text: lb.text };
     }
-    return null;
+    return best ? this.tr(best.text) : null;
   }
 
   levelsOf(b) {
@@ -352,20 +360,26 @@ export class TarkovMap {
 
   setBuildingLevel(b, levelId) {
     if (levelId) this.bState.set(b, levelId); else this.bState.delete(b);
+    if (levelId && this.floor) return this.setFloor(''); // этаж одного здания отменяет этаж всей карты
     this.applyBuildingFloors();
   }
 
-  // выбранные этажи — только внутри своих зданий; под ними основа затемняется, сами этажи подсвечены
+  // этаж всей карты — группа SVG целиком, основа приглушена; этажи зданий — только внутри своих зданий,
+  // под ними основа затемняется, сами этажи подсвечены
   applyBuildingFloors() {
     const root = this.svgRoot;
     if (!root) return;
     root.querySelectorAll('clipPath.th-clip').forEach((c) => c.remove());
     this.dimEl.replaceChildren();
     const rootCTM = root.getScreenCTM();
+    const layer = (this.def.layers || []).find((l) => l.name === this.floor);
+    const globalId = this.svgGroupOf(layer)?.id || null;
+    for (const g of [...root.children].filter((c) => c.classList?.contains('base-layer'))) g.classList.toggle('th-off', !!globalId && !layer.show);
     for (const g of [...root.children].filter((c) => c.classList?.contains('overlay-layer'))) {
       const users = [...this.bState].filter(([, id]) => id === g.id).map(([b]) => b);
       g.removeAttribute('clip-path');
-      g.classList.toggle('th-active', users.length > 0);
+      g.classList.toggle('th-active', g.id === globalId || users.length > 0);
+      if (g.id === globalId) { g.classList.remove('hidden-layer'); continue; }
       if (!users.length) { g.classList.add('hidden-layer'); continue; }
       g.classList.remove('hidden-layer'); // у скрытой группы нет матрицы преобразования — сначала показываем
       // прямоугольники зданий (с запасом) — из координат корня в координаты группы уровня
@@ -426,8 +440,11 @@ export class TarkovMap {
     return this.map.unproject(L.point(f.minX + ((x - f.vb.x) / f.vb.width) * (f.maxX - f.minX), f.minY + ((y - f.vb.y) / f.vb.height) * (f.maxY - f.minY)), 0);
   }
 
-  // ---------- этажи кнопками (спутник, Лабиринт, Ледокол) ----------
-  floors() { return (this.def?.layers || []).filter((l) => l.tilePath).map((l) => l.name); }
+  // ---------- этажи кнопками: этаж на всю карту ----------
+  floors() { return (this.def?.layers || []).filter((l) => l.tilePath || l.svgLayer).map((l) => l.name); }
+
+  // группа этажа в SVG (если у слоя есть векторная версия)
+  svgGroupOf(layer) { return layer?.svgLayer && this.svgRoot ? this.svgRoot.querySelector('#' + CSS.escape(layer.svgLayer)) : null; }
 
   setFloor(name) {
     this.floor = name;
@@ -436,16 +453,19 @@ export class TarkovMap {
     const layer = (this.def.layers || []).find((l) => l.name === name);
     const baseEl = this.base?._container || this.base?._image;
     baseEl?.classList.remove('off-level');
-    if (layer?.tilePath) {
+    // векторная версия этажа — показывается группой SVG (applyBuildingFloors); иначе плитки tarkov.dev поверх основы
+    if (layer?.tilePath && !this.svgGroupOf(layer)) {
       this.floorLayer = L.tileLayer(layer.tilePath, { tileSize: this.def.tileSize || 256, bounds: getBounds(this.def.bounds), maxZoom: Math.max(7, this.def.maxZoom), maxNativeZoom: this.def.maxZoom, noWrap: true, className: this.def.svgPath ? 'th-sat' : 'th-tiles' }).addTo(this.map);
       if (!layer.show) baseEl?.classList.add('off-level');
     }
-    this.applyFloorToMarkers();
+    if (name) this.bState.clear(); // этаж всей карты отменяет этажи отдельных зданий
+    this.onFloor?.(name);
+    if (this.svgRoot) this.applyBuildingFloors(); else this.applyFloorToMarkers();
   }
 
   markerVisible(h) {
+    const s = this.bState.size ? this.toSvg(h.p) : null;
     for (const [b, id] of this.bState) {
-      const s = this.toSvg(h.p);
       const { x, y, w, h: rh } = b.rect;
       if (!s || s.x < x || s.x > x + w || s.y < y || s.y > y + rh) continue;
       const lv = this.levelsOf(b).find((l) => l.id === id);
@@ -628,7 +648,7 @@ export class TarkovMap {
 
   focusObjective(objectiveId) {
     const list = this.questMarkers.get(objectiveId);
-    if (!list?.length || !this.map) return false;
+    if (!list?.length || !this.map || !this.map.getSize().x) return false; // скрытый контейнер (компактный режим): лететь некуда
     if (list.length === 1) this.map.flyTo(list[0].getLatLng(), Math.max(this.map.getZoom(), (this.def.maxZoom || 6) - 1), { duration: 0.6 });
     else this.map.flyToBounds(L.latLngBounds(list.map((m) => m.getLatLng())).pad(0.4), { duration: 0.6, maxZoom: this.def.maxZoom });
     setTimeout(() => {
@@ -640,7 +660,7 @@ export class TarkovMap {
   }
 
   focusPoint(p) {
-    if (!this.map || !p) return;
+    if (!this.map || !p || !this.map.getSize().x) return;
     this.map.flyTo(pos(p), Math.max(this.map.getZoom(), (this.def.maxZoom || 6) - 1), { duration: 0.6 });
   }
 

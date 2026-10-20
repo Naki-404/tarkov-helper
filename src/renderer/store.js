@@ -20,8 +20,7 @@ export function indexData() {
   for (const m of d.maps) idx.map.set(m.id, m);
   for (const s of d.hideout) idx.station.set(s.id, s);
   // группы карт: «Эпицентр»/«Эпицентр 21+», «Завод»/«Ночной завод», «Лаборатория»/Dark — одно место
-  const key = (m) => (m.normalizedName.startsWith('ground-zero') ? 'gz' : m.normalizedName.endsWith('factory') ? 'factory'
-    : m.normalizedName === 'the-lab' || m.normalizedName === 'the-lab-dark' ? 'lab' : m.id);
+  const key = (m) => { const n = m.normalizedName || ''; return n.startsWith('ground-zero') ? 'gz' : n.endsWith('factory') ? 'factory' : n === 'the-lab' || n === 'the-lab-dark' ? 'lab' : m.id; };
   const groups = new Map();
   for (const m of d.maps) { const k = key(m); if (!groups.has(k)) groups.set(k, new Set()); groups.get(k).add(m.id); }
   for (const m of d.maps) idx.group.set(m.id, groups.get(key(m)));

@@ -47,8 +47,11 @@ class Settings {
     this.save();
   }
   save() {
+    // через временный файл: падение во время записи не оставит обрезанный JSON (и сброшенные настройки)
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+    const tmp = this.file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
+    fs.renameSync(tmp, this.file);
   }
 }
 

@@ -117,11 +117,14 @@ function snapshot() {
 }
 
 let stateTimer = null;
+let stateDirty = false; // окно скрыто — снимок не считаем, отправим при показе
 function stateChanged() {
+  if (win && !win.isDestroyed() && (!win.isVisible() || win.isMinimized())) { stateDirty = true; return; }
   // группируем частые изменения (например, при пересканировании)
   if (stateTimer) return;
-  stateTimer = setTimeout(() => { stateTimer = null; send('state', snapshot()); }, 120);
+  stateTimer = setTimeout(() => { stateTimer = null; stateDirty = false; send('state', snapshot()); }, 120);
 }
+function flushState() { if (stateDirty) { stateDirty = false; stateChanged(); } }
 
 let saveTimer = null;
 function saveProgressSoon() {
@@ -237,7 +240,7 @@ watcher.on('event', (ev) => {
     // при запуске приложения: молча восстанавливаем режим, карту и состояние рейда
     applyEvent(ev, { live: false });
     if (ev.type === 'mode') live.mode = ev.mode;
-    if (ev.type === 'mapLoading' || ev.type === 'raidCreated') { live.map = ev.location; live.raidState = 'loading'; }
+    if ((ev.type === 'mapLoading' || ev.type === 'raidCreated') && ev.location) { live.map = ev.location; live.raidState = 'loading'; }
     if (ev.type === 'matchingStarted') live.raidState = 'matching';
     if (ev.type === 'raidStarted') live.raidState = 'inraid';
     if (ev.type === 'raidEnded' || ev.type === 'matchingCancelled') live.raidState = 'idle';
@@ -280,7 +283,7 @@ async function doScan(force) {
       }
       if (s !== current) done.add(s);
       n++;
-      if (n % 25 === 0) await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r)); // между сессиями — дать окну и IPC подышать
     }
     progress.data.scannedSessions = [...done];
     if (lastProfile) progress.setActiveProfile(lastProfile, lastMode);
@@ -301,12 +304,14 @@ async function loadData({ force = false, notify = false } = {}) {
   const lang = settings.get('lang');
   const mode = dataMode();
   const key = `${mode}-${lang}`;
+  // уже загружено и свежо — без повторного разбора кэша (~20 МБ JSON) и повторной отправки в окно
+  if (!force && gameData && gameData.lang === lang && gameData.mode === mode && !data.isStale(gameData)) return;
+  if (inflight.has(key)) return inflight.get(key);
   const cached = data.loadCache(userDir, lang, mode);
   if (cached && (!gameData || gameData.lang !== lang || gameData.mode !== mode || gameData.fetchedAt < cached.fetchedAt)) {
     setGameData(cached);
   }
   if (cached && !force && !data.isStale(cached)) return;
-  if (inflight.has(key)) return inflight.get(key);
   const job = (async () => {
     try {
       const fresh = await data.fetchAll(lang, mode);
@@ -366,6 +371,8 @@ function createWindow() {
   };
   win.on('moved', saveBounds);
   win.on('resized', saveBounds);
+  win.on('show', flushState);
+  win.on('restore', flushState);
   win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide(); } });
 
   // ссылки (вики и т.п.) открываются в обычном браузере
@@ -489,7 +496,8 @@ function cleanSettings(patch) {
     out.hotkeys = {};
     for (const k of ['toggle', 'clickThrough', 'map', 'quests', 'compact']) {
       const v = patch.hotkeys[k];
-      if (typeof v === 'string' && v.length < 40 && /^[\w+]*$/.test(v)) out.hotkeys[k] = v;
+      // акселератор Electron: буквы, цифры, F1…F24, Up/Down, Plus, знаки препинания — любой печатный ASCII без пробелов
+      if (typeof v === 'string' && v.length < 40 && /^[!-~]*$/.test(v)) out.hotkeys[k] = v;
     }
   }
   return out;
@@ -521,7 +529,8 @@ handle('getLabelsRu', () => { try { return JSON.parse(fs.readFileSync(path.join(
 const sanitizeSvg = (txt) => txt
   .replace(/<script[\s\S]*?<\/script\s*>/gi, '')
   .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, '')
-  .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, '');
+  .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  .replace(/\s(?:xlink:)?href\s*=\s*(["']?)\s*javascript:[^"'>\s]*\1/gi, '');
 handle('getSvg', async (url) => {
   if (typeof url !== 'string' || !/^https:\/\/assets\.tarkov\.dev\/maps\/svg\/[\w-]+\.svg$/.test(url)) throw new Error('bad url');
   // векторные карты лежат в самом приложении (assets/maps) — сеть нужна, только если файла нет
@@ -562,8 +571,13 @@ handle('resetProfile', async () => {
   progress.resetActive(); progress.save(); stateChanged(); return true;
 });
 handle('rescan', async () => {
-  const p = progress.active; p.logEvents = []; delete p._keys;
+  if (!live.logsOk) { send('toast', 'Папка логов недоступна — пересканировать нечего, прогресс оставлен'); return { sessions: 0 }; }
+  // старые события убираются только после удачного скана: если логи уже удалены, история профиля не пропадёт
+  const p = progress.active;
+  const backup = p.logEvents;
+  p.logEvents = []; delete p._keys;
   const r = await scanAllLogs(true);
+  if (!r.sessions) { p.logEvents = backup; delete p._keys; stateChanged(); send('toast', 'Сессий логов не найдено — прогресс оставлен как был'); return r; }
   send('toast', `Логи пересканированы: ${r.sessions} сессий`);
   return r;
 });
@@ -645,6 +659,9 @@ app.whenReady().then(async () => {
   stateChanged();
   if (DEV && process.env.TH_SHOT) runShots(process.env.TH_SHOT);
   if (DEV && process.env.TH_HIDE) setTimeout(() => win?.hide(), Number(process.env.TH_HIDE) * 1000); // замер памяти со скрытым окном
+  // базы нет (первый запуск без сети) — пробуем снова, всё реже, пока не загрузится
+  const retry = (ms) => setTimeout(async () => { if (gameData) return; await loadData({}); if (!gameData) retry(Math.min(ms * 2, 10 * 60 * 1000)); }, ms);
+  if (!gameData) retry(30 * 1000);
   // периодическое обновление базы (цены, новые квесты после патчей) — тихо
   setInterval(() => { if (gameData && data.isStale(gameData)) loadData({ force: true }); }, 30 * 60 * 1000);
 });

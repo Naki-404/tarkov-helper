@@ -122,6 +122,7 @@ class LogWatcher extends EventEmitter {
     this.lastList = 0;
     this.lastActivity = 0;  // когда любой файл текущей сессии (включая backend/output) последний раз вырос
     this.sizes = new Map();
+    this.wasActive = null;  // прошлое значение gameActive — переход true→false случается между тиками
   }
 
   start(logsDir) {
@@ -147,10 +148,12 @@ class LogWatcher extends EventEmitter {
 
   get gameActive() { return Date.now() - this.lastActivity < IDLE_MS; }
 
-  // активность игры: растёт ли хоть один файл сессии (только размер, без чтения)
+  // активность игры: растёт ли хоть один файл сессии (только размер, без чтения).
+  // Один readdir + stat на тик; возвращает размеры отслеживаемых файлов логов.
   checkActivity(dir, initial) {
+    const watched = new Map();
     let names;
-    try { names = fs.readdirSync(dir).filter((f) => f.endsWith('.log')); } catch { return; }
+    try { names = fs.readdirSync(dir).filter((f) => f.endsWith('.log')); } catch { return watched; }
     for (const f of names) {
       let st;
       try { st = fs.statSync(path.join(dir, f)); } catch { continue; }
@@ -159,7 +162,9 @@ class LogWatcher extends EventEmitter {
       else if (prev !== undefined && st.size > prev) this.lastActivity = Date.now();
       else if (prev === undefined) this.lastActivity = Math.max(this.lastActivity, st.mtimeMs);
       this.sizes.set(f, st.size);
+      if (WATCHED_FILES.test(f)) watched.set(path.join(dir, f), st.size);
     }
+    return watched;
   }
 
   tick(initial) {
@@ -182,23 +187,26 @@ class LogWatcher extends EventEmitter {
       }
     }
     const dir = path.join(this.logsDir, this.session);
-    const wasActive = this.gameActive;
-    this.checkActivity(dir, initial);
-    if (!initial && wasActive !== this.gameActive) this.emit('activity', this.gameActive);
-    for (const file of listSessionFiles(dir)) {
-      let st;
-      try { st = fs.statSync(file); } catch { continue; }
+    const sizes = this.checkActivity(dir, initial);
+    const active = this.gameActive;
+    if (!initial && this.wasActive !== null && this.wasActive !== active) this.emit('activity', active);
+    this.wasActive = active;
+    // при первом чтении события всех файлов сессии отдаются по времени: иначе квесты из push-notifications
+    // приписались бы последнему профилю из application.log, а не тому, при котором случились
+    const batch = initial ? [] : null;
+    const out = (ev) => (batch ? batch.push(ev) : this.emit('event', ev));
+    for (const [file, size] of sizes) {
       let state = this.files.get(file);
       if (!state) {
         // декодер на файл: многобайтовая буква на границе куска не ломается
         state = { offset: 0, rest: '', lastGrowth: Date.now(), restIsReplay: false, decoder: new StringDecoder('utf8') };
         this.files.set(file, state);
       }
-      if (st.size < state.offset) { state.offset = 0; state.rest = ''; state.decoder = new StringDecoder('utf8'); }
+      if (size < state.offset) { state.offset = 0; state.rest = ''; state.decoder = new StringDecoder('utf8'); }
       let chunk = '';
-      if (st.size > state.offset) {
+      if (size > state.offset) {
         let buf;
-        try { buf = readRange(file, state.offset, st.size); } catch { continue; }
+        try { buf = readRange(file, state.offset, size); } catch { continue; }
         state.offset += buf.length;
         chunk = state.decoder.write(buf);
         state.lastGrowth = Date.now();
@@ -207,16 +215,18 @@ class LogWatcher extends EventEmitter {
       const flush = !chunk && state.rest && Date.now() - state.lastGrowth > 2000;
       if (!chunk && !flush) continue;
       // replay: события, которые уже были в логе на момент запуска приложения
-      // (в том числе последняя запись, придержанная при первом чтении)
+      // (в том числе последняя запись, придержанная при первом чтении, — даже если файл дорос раньше чем за 2 с)
       const replay = initial || (!chunk && state.restIsReplay);
+      const firstIsReplay = state.restIsReplay && !!state.rest;
       const { entries, rest } = splitEntries(state.rest + chunk, flush);
       state.rest = rest;
       state.restIsReplay = initial;
-      for (const e of entries) {
+      entries.forEach((e, i) => {
         const ev = entryToEvent(e);
-        if (ev) this.emit('event', { ...ev, replay, session: this.session });
-      }
+        if (ev) out({ ...ev, replay: replay || (i === 0 && firstIsReplay), session: this.session });
+      });
     }
+    if (batch) { batch.sort((a, b) => a.ts - b.ts); for (const ev of batch) this.emit('event', ev); }
   }
 }
 
