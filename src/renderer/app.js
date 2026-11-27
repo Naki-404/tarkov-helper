@@ -421,7 +421,7 @@ function renderRaid() {
     const points = [];
     const addPoints = (t, extra) => {
       for (const o of t.objectives) {
-        const base = { objectiveId: o.id, taskId: t.id, title: t.name, sub: trader(t.trader).name, text: objText(o), type: o.type, ...extra(o) };
+        const base = { objectiveId: o.id, taskId: t.id, title: t.name, sub: trader(t.trader).name, text: objText(o), type: o.type, ...objIcon(o), ...extra(o) };
         for (const z of o.zones || []) if (ids.has(z.map) && z.position) points.push({ ...base, kind: 'zone', position: z.position, outline: z.outline, top: z.top, bottom: z.bottom });
         for (const l of o.possibleLocations || []) if (ids.has(l.map)) for (const p of l.positions) points.push({ ...base, kind: 'item', position: p });
       }
@@ -436,7 +436,7 @@ function renderRaid() {
       for (const o of t.objectives) if (objOnMap(o, ids)) for (const alt of o.requiredKeys || []) (Array.isArray(alt) ? alt : [alt]).forEach((k) => needKeys.add(idOf(k)));
     }
     const ls = ui.raidMap + [...needKeys].sort().join();
-    if (ls !== locksSig) { locksSig = ls; tmap.drawLocks(m?.locks, (id) => ({ name: item(id).n, need: needKeys.has(id) })); }
+    if (ls !== locksSig) { locksSig = ls; tmap.drawLocks(m?.locks, (id) => ({ name: item(id).n, short: item(id).s, icon: item(id).i, need: needKeys.has(id) })); }
   }
 
   // брифинг
@@ -464,6 +464,14 @@ function renderRaid() {
     + group('anywhere', 'На любой локации', g.anywhere) + group('avail', 'Можно взять здесь', g.avail, { avail: true });
   if (!here.length && !g.tracked.length) html = '<div class="empty"><b>На этой карте активных задач нет</b>Возьми квест в игре — он появится здесь сам. Звезда закрепит любой квест наверху.</div>' + html;
   setHtml($('#taskBody'), html);
+}
+
+// что изображено на метке условия: сам предмет (найти, заложить, отметить маркером), иначе — только значок действия
+function objIcon(o) {
+  if (o.questItem?.iconLink) return { icon: o.questItem.iconLink, iconName: o.questItem.name };
+  const id = objItems(o)[0];
+  const it = id ? item(id) : null;
+  return it?.i ? { icon: it.i, iconName: it.n } : {};
 }
 
 function taskRow(t, opt) {
@@ -556,23 +564,30 @@ new ResizeObserver(([e]) => document.documentElement.style.setProperty('--hud-h'
 // легенда: те же разметка и стили, что у значков на карте
 const legendHtml = () => {
   const row = (icon, text) => `<div class="lgr"><i class="box">${icon}</i><span>${text}</span></div>`;
+  // примеры — на настоящих картинках этой карты: маркер, первый ключ, первый босс с портретом
+  const m = idx.map.get(ui.raidMap);
+  const marker = item('5991b51486f77447b112d44f').i;
+  const keyIcon = item((m?.locks || []).find((l) => item(l.key).i)?.key).i;
+  const boss = (m?.bosses || []).find((b) => b.portrait && b.spawnChance > 0);
+  const face = ICON.boss + (boss ? `<img src="${esc(boss.portrait)}" alt="">` : '');
+  const acts = [['findQuestItem', 'найти'], ['plantItem', 'заложить'], ['mark', 'отметить'], ['visit', 'найти место'], ['shoot', 'убить']];
   return `<h4>Значки на карте</h4><div class="lg-grid">
-    ${row(questPin('active', 3, 'visit'), 'Метка задания: остриё — место, внутри — что сделать, цифра — номер квеста в списке задач')}
-    ${row(questPin('tracked', 1, 'findQuestItem'), 'Закреплённый квест — светлая обводка и номер на янтаре')}
-    ${row(questPin('done', 2, 'plantItem'), 'Условие выполнено')}
-    ${row(questPin('avail', null, 'mark'), 'Квест можно взять — его точка на этой карте')}
-    ${row(`<span class="lg-glyphs">${['findQuestItem', 'plantItem', 'mark', 'shoot'].map(glyphIcon).join('')}</span>`, 'Значки: найти · заложить · отметить маркером · убить')}
+    ${row(questPin('active', 3, 'mark', marker), 'Задание с предметом: в кружке — сам предмет, в углу — что с ним сделать, цифра — номер квеста в списке')}
+    ${row(questPin('active', 2, 'visit'), 'Задание без предмета: в кружке — что сделать. Остриё — точное место')}
+    ${row(questPin('tracked', 1, 'findQuestItem'), 'Закреплённый квест — светлый ободок, его название видно всегда')}
+    ${row(questPin('done', 4, 'plantItem'), 'Условие уже выполнено')}
+    ${row(questPin('avail', null, 'visit'), 'Квест можно взять — его место на этой карте')}
     ${row('<span class="lg-zone"></span>', 'Зона, где засчитывается условие')}
-    ${row(`<div class="mk-x pmc">${ICON.exit}</div>`, 'Выход ЧВК')}
+    <div class="lgr span2"><span class="lg-acts">${acts.map(([t, w]) => `<span>${glyphIcon(t)}${w}</span>`).join('')}</span></div>
+    ${row(`<div class="mk-key need">${keyIcon ? `<img src="${esc(keyIcon)}" alt="">` : ''}<span class="mk-kl">${ICON.lock}</span></div>`, 'Дверь: картинка ключа от неё. Янтарная — ключ нужен для квеста')}
+    ${row(`<div class="mk-boss main" style="position:static;transform:none"><span class="mk-bf">${face}</span></div>`, 'Босс: портрет, имя и шанс. Маленькие портреты — другие места появления')}
+    ${row(`<div class="mk-x pmc">${ICON.exit}</div>`, 'Выход ЧВК, название рядом')}
     ${row(`<div class="mk-x scav">${ICON.exit}</div>`, 'Выход Диких')}
     ${row(`<div class="mk-x shared">${ICON.exit}</div>`, 'Общий выход')}
     ${row(`<div class="mk-tr">${ICON.transit}</div>`, 'Переход на другую карту')}
     ${row(`<div class="mk-sp pmc">${ICON.spawn}</div>`, 'Спавн ЧВК (Диких — песочный)')}
-    ${row(`<div class="mk-boss" style="position:static;transform:none">${ICON.boss}<em>60%</em></div>`, 'Босс и шанс появления, точки — где он бывает')}
-    ${row(`<div class="mk-lock need">${ICON.lock}</div>`, 'Дверь с ключом; подсвечена — ключ нужен для квеста')}
-    ${row('<span class="lg-floor"></span>', 'Выбранный этаж')}
-    ${row('<span class="lg-dim"></span>', 'Другие этажи приглушены')}
-  </div><div class="lg-foot">Наведи на значок — подсказка с фото; клик по зданию — этаж выше, правый клик — ниже.</div>`;
+    ${row('<span class="lg-floor"></span>', 'Выбранный этаж, остальные приглушены')}
+  </div><div class="lg-foot">Приблизь карту — у меток появятся названия квестов. Клик по метке — карточка квеста, клик по зданию — этаж выше, правый клик — ниже.</div>`;
 };
 $('#btnLegend').addEventListener('click', () => {
   const lg = $('#legend');

@@ -5,21 +5,42 @@
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 // значки действия внутри булавки (24×24)
+// значки действий (24×24): что сделать в этом месте
 const GLYPH = {
-  "visit":"M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5Z",
-  "mark":"M14.4,6L14,4H5V21H7V14H12.6L13,16H20V6H14.4Z",
-  "plantItem":"M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z",
-  "findQuestItem":"M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3Z",
-  "shoot":"M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13Z",
-  "useItem":"M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,7V13H13V7H11M11,15V17H13V15H11Z",
+  // бинокль — «найти место, осмотреть»
+  visit: 'M11,6H13V13H11V6M9,20A1,1 0 0,1 8,21H5A1,1 0 0,1 4,20V15L6,6H10V13A1,1 0 0,1 9,14V20M10,5H7V3H10V5M15,20V14A1,1 0 0,1 14,13V6H18L20,15V20A1,1 0 0,1 19,21H16A1,1 0 0,1 15,20M14,5V3H17V5H14Z',
+  // флажок — «отметить маркером»
+  mark: 'M14.4,6L14,4H5V21H7V14H12.6L13,16H20V6H14.4Z',
+  // стрелка в ящик — «заложить / спрятать»
+  plantItem: 'M19,15H15A3,3 0 0,1 12,18A3,3 0 0,1 9,15H5V5H19M19,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M16,10H14V7H10V10H8L12,14L16,10Z',
+  // лупа — «найти предмет»
+  findQuestItem: 'M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z',
+  // прицел — «убить»
+  shoot: 'M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13M12,5A7,7 0 0,0 5,12A7,7 0 0,0 12,19A7,7 0 0,0 19,12A7,7 0 0,0 12,5Z',
+  // рука с предметом — «использовать»
+  useItem: 'M21,11H20V5A2,2 0 0,0 18,3H6A2,2 0 0,0 4,5V11H3A1,1 0 0,0 2,12V20A1,1 0 0,0 3,21H21A1,1 0 0,0 22,20V12A1,1 0 0,0 21,11M6,5H18V11H6V5M20,19H4V13H20V19M8,7H16V9H8V7Z',
+  // выход
+  extract: 'M13.34,8.17C12.41,8.17 11.65,7.4 11.65,6.47A1.69,1.69 0 0,1 13.34,4.78C14.28,4.78 15.04,5.54 15.04,6.47C15.04,7.4 14.28,8.17 13.34,8.17M10.3,19.93L4.37,18.75L4.71,17.05L8.86,17.9L10.21,11.04L8.69,11.64V14.5H7V10.54L11.4,8.67L12.07,8.59C12.67,8.59 13.17,8.93 13.5,9.44L14.36,10.79C15.04,12 16.39,12.82 18,12.82V14.5C16.14,14.5 14.44,13.67 13.34,12.4L12.84,14.94L14.61,16.63V23H12.92V17.9L11.14,16.21L10.3,19.93M21,23H19V3H6V16.82L4,16.4V1H21V23M6,23H4V19.85L6,20.27V23Z',
+  // ключ — двери
+  key: 'M7,14A2,2 0 0,1 5,12A2,2 0 0,1 7,10A2,2 0 0,1 9,12A2,2 0 0,1 7,14M12.65,10C11.83,7.67 9.61,6 7,6A6,6 0 0,0 1,12A6,6 0 0,0 7,18C9.61,18 11.83,16.33 12.65,14H17V18H21V14H23V10H12.65Z',
 };
-const GLYPH_ALIAS = {"plantQuestItem":"plantItem","findItem":"findQuestItem","giveQuestItem":"findQuestItem","giveItem":"findQuestItem","extract":"useItem","experience":"useItem","buildWeapon":"useItem"};
+const GLYPH_ALIAS = { plantQuestItem: 'plantItem', findItem: 'findQuestItem', giveQuestItem: 'findQuestItem', giveItem: 'findQuestItem', experience: 'useItem', buildWeapon: 'useItem' };
+// что сделать — подпись к значку
+export const ACTION = { visit: 'Найти место', mark: 'Отметить маркером', plantItem: 'Заложить', plantQuestItem: 'Заложить', findQuestItem: 'Найти', findItem: 'Найти', giveQuestItem: 'Найти и сдать',
+  giveItem: 'Найти и сдать', shoot: 'Убить', useItem: 'Использовать', extract: 'Выйти', experience: 'Условие', buildWeapon: 'Собрать оружие' };
 const glyphOf = (type) => GLYPH[type] || GLYPH[GLYPH_ALIAS[type]] || GLYPH.visit;
 export const glyphIcon = (type) => `<svg viewBox="0 0 24 24"><path d="${glyphOf(type)}"/></svg>`;
-// метка условия квеста: янтарная булавка со значком действия внутри и номером квеста (как в списке задач) сбоку.
-// Значок нарисован в самом SVG: маски CSS на маркерах при программной отрисовке пропадают
-export const questPin = (state, n, type) => `<div class="mq ${state}"><svg class="mq-pin" viewBox="0 0 28 36"><path class="mq-pp" d="M14 1.5C7.1 1.5 1.5 7 1.5 13.8c0 8.9 10.9 19.6 11.8 20.5a1 1 0 0 0 1.4 0c.9-.9 11.8-11.6 11.8-20.5C26.5 7 20.9 1.5 14 1.5Z"/>`
-  + `<path class="mq-gp" transform="translate(6.5 6) scale(.625)" d="${glyphOf(type)}"/></svg>${n != null && state !== 'avail' ? `<b class="mq-n">${esc(n)}</b>` : ''}</div>`;
+// метка условия квеста: круглая головка на острие. В головке — сам предмет (что найти, заложить, чем отметить),
+// а если предмета нет — крупный значок действия. Значок действия у предмета — в углу, номер квеста — бирка сверху,
+// название квеста — рядом (при приближении и у закреплённых). Всё — картинки и SVG: маски CSS на маркерах с тенью пропадают.
+export const questPin = (state, n, type, icon, label) => {
+  const act = `<svg viewBox="0 0 24 24"><path d="${glyphOf(type)}"/></svg>`;
+  const head = icon ? `<img src="${esc(icon)}" alt="" loading="lazy">` : act;
+  return `<div class="mq ${state}${icon ? ' pic' : ''}"><div class="mq-h">${head}</div><i class="mq-tip"></i>`
+    + (icon ? `<span class="mq-a">${act}</span>` : '')
+    + (n != null && n !== '' && state !== 'avail' ? `<b class="mq-n">${esc(n)}</b>` : '')
+    + (label ? `<span class="mq-l">${esc(label)}</span>` : '') + '</div>';
+};
 
 export const ICON = {
   lock: '<svg viewBox="0 0 24 24"><path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>',
@@ -582,9 +603,12 @@ export class TarkovMap {
         const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length, cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
         const main = pts.reduce((best, p) => (Math.hypot(p.x - cx, p.z - cz) < Math.hypot(best.x - cx, best.z - cz) ? p : best), pts[0]);
         for (const p of pts) {
-          const html = p === main ? `<div class="mk-boss">${ICON.boss}${esc(b.name)}<em>${chance}%</em></div>` : '<div class="mk-boss pt"></div>';
+          // череп под портретом: у части боссов ссылки на портрет в tarkov.dev битые — тогда виден он
+          const face = ICON.boss + (b.portrait ? `<img src="${esc(b.portrait)}" alt="">` : '');
+          const html = p === main ? `<div class="mk-boss main"><span class="mk-bf">${face}</span><span class="mk-bl">${esc(b.name)} <em>${chance}%</em></span></div>`
+            : `<div class="mk-boss"><span class="mk-bf">${face}</span></div>`;
           const icon = L.divIcon({ className: 'mk', iconSize: [0, 0], html });
-          this.groups.bosses.addLayer(L.marker(pos(p), { icon, height: this.heightOpt(p), zIndexOffset: -200 })
+          this.groups.bosses.addLayer(L.marker(pos(p), { icon, height: this.heightOpt(p), zIndexOffset: p === main ? 100 : -200 })
             .bindTooltip(tip, { className: 'tt', direction: 'top', offset: [0, -10] }));
         }
       }
@@ -607,8 +631,11 @@ export class TarkovMap {
     for (const l of locks || []) {
       if (!l.position) continue;
       const k = keyInfo(l.key);
-      const icon = L.divIcon({ className: 'mk', iconSize: [18, 18], iconAnchor: [9, 9], html: `<div class="mk-lock${k.need ? ' need' : ''}">${ICON.lock}</div>` });
-      const tipHtml = `<b>${esc(k.name)}</b>${l.needsPower ? '<br>нужно питание' : ''}${k.need ? '<br>нужен для активного квеста' : ''}`;
+      // дверь — картинка ключа, который её открывает; замок в углу; нужный для квеста — янтарный, с названием ключа
+      const pic = k.icon ? `<img src="${esc(k.icon)}" alt="" loading="lazy">` : `<svg viewBox="0 0 24 24"><path d="${GLYPH.key}"/></svg>`;
+      const icon = L.divIcon({ className: 'mk', iconSize: [26, 26], iconAnchor: [13, 13],
+        html: `<div class="mk-key${k.need ? ' need' : ''}${l.needsPower ? ' power' : ''}">${pic}<span class="mk-kl">${ICON.lock}</span>${k.need ? `<span class="mk-kn">${esc(k.short || k.name)}</span>` : ''}</div>` });
+      const tipHtml = `<b>Дверь: ${esc(k.name)}</b>${l.needsPower ? '<br>нужно питание' : ''}${k.need ? '<br>ключ нужен для активного квеста' : ''}`;
       const make = () => L.marker(pos(l.position), { icon, height: this.heightOpt(l.position) }).bindTooltip(tipHtml, { className: 'tt', direction: 'top', offset: [0, -10] });
       this.groups.locks.addLayer(make());
       if (k.need) this.groups.questLocks.addLayer(make());
@@ -620,6 +647,7 @@ export class TarkovMap {
     if (!this.map) return;
     const z = this.map.getZoom();
     const base = this.def?.minZoom || 1;
+    this.el.classList.toggle('near', z >= base + 1); // приблизились — у меток видны названия квестов
     this.el.querySelectorAll('.mk-label').forEach((n) => {
       const s = Number(n.dataset.size) || 60;
       const px = (s / 10) * Math.pow(1.45, z - base - 1);
@@ -653,7 +681,7 @@ export class TarkovMap {
       }
       const state = p.avail ? 'avail' : p.done ? 'done' : p.tracked ? 'tracked' : 'active';
       // булавка: остриё — точно в месте условия
-      const icon = L.divIcon({ className: 'mk', iconSize: [28, 36], iconAnchor: [14, 35], popupAnchor: [0, -32], tooltipAnchor: [8, -18], html: questPin(state, p.n, p.type) });
+      const icon = L.divIcon({ className: 'mk', iconSize: [38, 48], iconAnchor: [19, 47], popupAnchor: [0, -44], tooltipAnchor: [14, -26], html: questPin(state, p.n, p.type, p.icon, p.title) });
       const mk = L.marker(pos(p.position), { icon, height: h, riseOnHover: true, zIndexOffset: p.tracked ? 500 : 0 });
       mk.bindTooltip(() => this.questTooltip(p), { className: 'tt tt-q', direction: 'auto', offset: [14, 0], opacity: 1 });
       mk.bindPopup(() => this.questCard?.(p) || `<div class="pop-title">${esc(p.title)}</div><div class="pop-sub">${esc(p.sub)}</div><div>${esc(p.text)}</div>

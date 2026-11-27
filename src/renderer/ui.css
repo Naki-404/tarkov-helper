@@ -695,6 +695,11 @@ a.map-credit:hover, a.map-credit:hover b { color: var(--text); }
 @media (max-width: 700px) { #btnPin, #btnSettings { display: none; } .omni { display: none; } .bar { gap: 8px; padding-left: 8px; } }
 .tl-main::first-letter { text-transform: uppercase; }
 .map-legend .lgr .mq { transform: scale(.8); }
-.map-legend .lg-glyphs { display: flex; gap: 4px; }
-.map-legend .lg-glyphs svg { width: 14px; height: 14px; fill: var(--accent); }
-.map-legend .lgr:has(.lg-glyphs) i.box { width: 72px; }
+.map-legend .lgr .mq { transform: scale(.7); }
+.map-legend .lgr .mq.avail { transform: scale(.55); }
+.map-legend .lgr i.box { width: 36px; height: 36px; }
+.map-legend .lgr.span2 { grid-column: 1 / -1; }
+.map-legend .lg-acts { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--dim); font-size: 12px; }
+.map-legend .lg-acts span { display: inline-flex; align-items: center; gap: 6px; }
+.map-legend .lg-acts svg { width: 16px; height: 16px; fill: var(--accent); }
+.map-legend .mk-boss.main .mk-bf { width: 32px; height: 32px; }

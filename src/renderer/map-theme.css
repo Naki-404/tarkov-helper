@@ -57,35 +57,48 @@
 /* зона, где засчитывается условие, — тонкий пунктир */
 path.qzone { pointer-events: none; }
 
-/* метка задания — янтарная булавка: остриё указывает место, внутри — что сделать, сбоку — номер квеста из списка задач */
-.mq { position: relative; width: 28px; height: 36px; transform-origin: 50% 100%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .65));
+/* метка условия квеста: круглая головка на острие. В головке — сам предмет (что найти, заложить, чем отметить)
+   или крупный значок действия; значок действия у предмета — в левом углу, номер квеста — бирка справа сверху,
+   название квеста — рядом, при приближении. Только картинки и SVG: маски CSS на маркерах с тенью не рисуются. */
+.mq { position: relative; width: 38px; height: 48px; transform-origin: 50% 100%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .65));
   transition: transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease); }
-.mq-pin { position: absolute; inset: 0; width: 28px; height: 36px; overflow: visible; }
-.mq-pp { fill: #E0A43C; stroke: #10110F; stroke-width: 1.5px; }
-.mq-gp { fill: #1A1206; }
-.mq-n { position: absolute; left: 20px; top: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #10110F; border: 1.5px solid #E0A43C;
-  color: #E0A43C; font: 600 11px/15px var(--mono); text-align: center; }
-/* закреплённый: светлая обводка, номер на янтаре */
-.mq.tracked .mq-pp { stroke: #F4F1E6; stroke-width: 2px; }
+.mq-h { position: absolute; left: 0; top: 0; width: 38px; height: 38px; border-radius: 50%; background: #10110F; border: 2.5px solid #E0A43C;
+  display: grid; place-items: center; overflow: hidden; z-index: 1; }
+.mq-h img { width: 30px; height: 30px; object-fit: contain; }
+.mq.pic .mq-h { background: #3A3B34; } /* светлее — тёмные предметы не сливаются с фоном */
+.mq-h svg { width: 20px; height: 20px; fill: #E0A43C; }
+.mq-tip { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); width: 0; height: 0;
+  border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 13px solid #E0A43C; }
+.mq-a { position: absolute; left: -6px; bottom: 6px; width: 18px; height: 18px; border-radius: 50%; background: #E0A43C; border: 1.5px solid #10110F;
+  display: grid; place-items: center; z-index: 2; }
+.mq-a svg { width: 11px; height: 11px; fill: #1A1206; }
+.mq-n { position: absolute; left: 28px; top: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #10110F; border: 1.5px solid #E0A43C;
+  color: #E0A43C; font: 600 11px/15px var(--mono); text-align: center; z-index: 2; }
+.mq-l { position: absolute; left: 46px; top: 9px; display: none; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none;
+  font: 600 12px/18px var(--ui); color: #F4F1E6; background: rgba(16, 17, 15, .9); border: 1px solid rgba(224, 164, 60, .55); border-radius: 4px; padding: 0 6px; }
+#map.near .mq-l, .mq.tracked .mq-l, .mq.hl .mq-l, .mq.focus .mq-l { display: block; }
+#map.near .mq.avail .mq-l, #map.near .mq.done .mq-l { display: none; }
+/* закреплённый: светлый ободок, номер на янтаре */
+.mq.tracked .mq-h { border-color: #F4F1E6; box-shadow: inset 0 0 0 2px #E0A43C; }
 .mq.tracked .mq-n { background: #E0A43C; color: #1A1206; border-color: #F4F1E6; }
+.mq.tracked .mq-l { border-color: #F4F1E6; }
 /* выполнено: зелёная, приглушённая */
-.mq.done { opacity: .65; }
-.mq.done .mq-pp { fill: #8BAF73; }
-.mq.done .mq-gp { fill: #182212; }
+.mq.done { opacity: .6; }
+.mq.done .mq-h { border-color: #8BAF73; }
+.mq.done .mq-h svg { fill: #8BAF73; }
+.mq.done .mq-tip { border-top-color: #8BAF73; }
+.mq.done .mq-a { background: #8BAF73; }
 .mq.done .mq-n { color: #8BAF73; border-color: #8BAF73; }
-/* можно взять: пустая булавка с пунктиром, поменьше */
-.mq.avail { transform: scale(.8); }
-.mq.avail .mq-pp { fill: rgba(16, 17, 15, .88); stroke: #A3A094; stroke-dasharray: 3 2; }
-.mq.avail .mq-gp { fill: #A3A094; }
-.t-visit { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5Z'/%3E%3C/svg%3E"); }
-.t-mark { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14.4,6L14,4H5V21H7V14H12.6L13,16H20V6H14.4Z'/%3E%3C/svg%3E"); }
-.t-plantItem, .t-plantQuestItem { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z'/%3E%3C/svg%3E"); }
-.t-findQuestItem, .t-findItem, .t-giveQuestItem, .t-giveItem { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3Z'/%3E%3C/svg%3E"); }
-.t-shoot { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13Z'/%3E%3C/svg%3E"); }
-.t-useItem, .t-extract, .t-experience, .t-buildWeapon { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,7V13H13V7H11M11,15V17H13V15H11Z'/%3E%3C/svg%3E"); }
+/* можно взять: пустой пунктирный кружок, поменьше */
+.mq.avail { transform: scale(.75); opacity: .9; }
+.mq.avail .mq-h { border-style: dashed; border-color: #A3A094; background: rgba(16, 17, 15, .85); }
+.mq.avail .mq-h svg { fill: #A3A094; }
+.mq.avail .mq-h img { opacity: .75; }
+.mq.avail .mq-tip { border-top-color: #A3A094; }
+.mq.avail .mq-a { background: #A3A094; }
 #map.hovering .mq:not(.hl) { opacity: .3; }
-.mq.hl, .mq.focus { transform: scale(1.25); }
-.mq.avail.hl, .mq.avail.focus { transform: scale(1); }
+.mq.hl, .mq.focus { transform: scale(1.2); }
+.mq.avail.hl, .mq.avail.focus { transform: scale(.95); }
 
 /* выходы: квадрат цвета фракции и подпись рядом, как на бумажной карте */
 .mk-x { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; border: 1.5px solid var(--fc); background: rgba(16, 17, 15, .94);
@@ -113,9 +126,29 @@ path.qzone { pointer-events: none; }
 .mk-sp.pmc { border-color: #8BAF73; } .mk-sp.pmc svg { fill: #8BAF73; }
 .mk-sp.scav { border-color: #C9B98F; } .mk-sp.scav svg { fill: #C9B98F; }
 
-/* боссы: красная бирка с шансом */
-.mk-boss { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px 0 4px; border-radius: 4px; background: rgba(16, 17, 15, .94);
-  border: 1.5px solid #CC6A55; color: #E8E5DA; font: 600 11px var(--ui); white-space: nowrap; transform: translate(-50%, -50%); position: absolute; box-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
-.mk-boss svg { width: 12px; height: 12px; fill: #CC6A55; flex: none; }
-.mk-boss em { font: 400 11px var(--mono); font-style: normal; color: #CC6A55; }
-.mk-boss.pt { width: 10px; height: 10px; padding: 0; border-radius: 50%; background: #CC6A55; border: 1.5px solid #10110F; }
+/* боссы: портрет в красной рамке; у главного места — крупный портрет с именем и шансом, на остальных — маленький */
+.mk-boss { position: absolute; transform: translate(-50%, -50%); }
+.mk-bf { position: relative; display: block; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #CC6A55; background: #1E1513; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .65); }
+.mk-bf img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.mk-bf svg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 60%; height: 60%; fill: #CC6A55; opacity: .45; }
+.mk-boss:not(.main) { opacity: .75; }
+.mk-boss:not(.main) .mk-bf { width: 20px; height: 20px; }
+.mk-boss.main { display: flex; align-items: center; gap: 6px; transform: translate(-20px, -50%); }
+.mk-boss.main .mk-bf { width: 40px; height: 40px; border-width: 2.5px; flex: none; }
+.mk-bl { white-space: nowrap; font: 600 12px/18px var(--ui); color: #F4F1E6; background: rgba(16, 17, 15, .92); border: 1px solid rgba(204, 106, 85, .6);
+  border-radius: 4px; padding: 0 6px; box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
+.mk-bl em { font: 600 11px var(--mono); font-style: normal; color: #E08A76; }
+
+/* двери: картинка ключа, замок в углу; ключ нужен для квеста — янтарная рамка и название ключа */
+.mk-key { position: relative; width: 26px; height: 26px; border-radius: 6px; background: rgba(16, 17, 15, .94); border: 1.5px solid rgba(217, 178, 92, .55);
+  display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+.mk-key img { width: 22px; height: 22px; object-fit: contain; }
+.mk-key > svg { width: 16px; height: 16px; fill: #D9B25C; }
+.mk-kl { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 3px; background: #D9B25C; border: 1.5px solid #10110F; display: grid; place-items: center; }
+.mk-kl svg { width: 8px; height: 8px; fill: #1A1206; }
+.mk-key.need { border: 2px solid #E0A43C; }
+.mk-key.need .mk-kl { background: #E0A43C; }
+.mk-kn { position: absolute; left: 32px; top: 50%; transform: translateY(-50%); white-space: nowrap; pointer-events: none;
+  font: 600 12px var(--ui); color: #E0A43C; text-shadow: 0 0 2px #0D0E0C, 0 0 4px #0D0E0C, 0 1px 2px #0D0E0C; }
+

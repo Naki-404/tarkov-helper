@@ -8,7 +8,7 @@ const path = require('path');
 
 const BASE = 'https://json.tarkov.dev';
 const STALE_MS = 12 * 60 * 60 * 1000; // данные старше 12 часов обновляются в фоне (база ~20 МБ)
-const CACHE_VERSION = 7;
+const CACHE_VERSION = 8;
 
 const TRANSLATE_KEYS = new Set(['name', 'shortName', 'description', 'exitName', 'targetNames', 'exitStatus',
   'effects', 'bodyParts', 'zoneName', 'Nickname', 'customizationTypeName']);
@@ -107,7 +107,7 @@ function mapBosses(m, mobs) {
       positions.push(...(spots.length ? spots : zone.map((s) => s.position)));
     }
     let e = out.get(mob);
-    if (!e) out.set(mob, e = { name: mobs[mob]?.name || mob, spawnChance: 0, escorts: 0, positions: [], seen: new Set() });
+    if (!e) out.set(mob, e = { name: mobs[mob]?.name || mob, portrait: mobs[mob]?.imagePortraitLink || null, spawnChance: 0, escorts: 0, positions: [], seen: new Set() });
     e.spawnChance = Math.max(e.spawnChance, b.spawnChance || 0);
     e.escorts = Math.max(e.escorts, escortsMax(b));
     for (const p of positions.map(pos).filter(Boolean)) {
