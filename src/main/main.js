@@ -8,6 +8,7 @@ const { LogWatcher, detectLogsDir, listSessions, parseSession } = require('./log
 const { ScreenshotWatcher, defaultScreenshotsDir } = require('./screenshots');
 const data = require('./tarkovdata');
 const { Wiki } = require('./wiki');
+const { Extras } = require('./extras');
 
 // отладка (только при запуске из исходников): отдельная папка данных и снимки окна
 const DEV = !app.isPackaged;
@@ -29,6 +30,9 @@ const progress = new ProgressStore(path.join(userDir, 'progress.json'));
 const watcher = new LogWatcher();
 const shots = new ScreenshotWatcher();
 const wiki = new Wiki(path.join(userDir, 'th-cache'));
+// подсказки к квестам и квесты вне tarkov.dev: кэш, иначе файл из assets
+const extras = new Extras(path.join(userDir, 'th-cache'), path.join(__dirname, '..', '..', 'assets'));
+extras.load();
 
 let win = null;
 let tray = null;
@@ -581,7 +585,12 @@ handle('rescan', async () => {
   send('toast', `Логи пересканированы: ${r.sessions} сессий`);
   return r;
 });
-handle('refreshData', () => loadData({ force: true, notify: true }));
+// дополнения к квестам (eft_quest_helper): ошибка не мешает, остаются прежние
+function refreshExtras() {
+  return extras.refresh().then((d) => send('extras', d)).catch((e) => console.error('quest extras:', e.message));
+}
+handle('refreshData', () => { refreshExtras(); return loadData({ force: true, notify: true }); });
+handle('getExtras', () => extras.data);
 handle('setSettings', async (patch) => {
   const clean = cleanSettings(patch);
   const before = { ...settings.data };
@@ -657,6 +666,7 @@ app.whenReady().then(async () => {
   if (!gameData || gameData.mode !== dataMode() || gameData.lang !== settings.get('lang')) await loadData({});
   startScreenshots();
   stateChanged();
+  if (extras.isStale()) refreshExtras(); // раз в неделю
   if (DEV && process.env.TH_SHOT) runShots(process.env.TH_SHOT);
   if (DEV && process.env.TH_HIDE) setTimeout(() => win?.hide(), Number(process.env.TH_HIDE) * 1000); // замер памяти со скрытым окном
   // базы нет (первый запуск без сети) — пробуем снова, всё реже, пока не загрузится

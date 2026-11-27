@@ -11,7 +11,7 @@
 <body>
   <!-- ============ Командная строка ============ -->
   <header class="bar">
-    <div class="brand"><span class="glyph" aria-hidden="true"></span><span class="wordmark">TARKOV<b>HELPER</b></span></div>
+    <div class="brand"><span class="glyph" aria-hidden="true"></span><span class="wordmark">Tarkov<b>Helper</b></span></div>
 
     <nav class="ws" id="ws" aria-label="Разделы">
       <button data-view="raid" class="on" title="Карта и задачи на рейд (Ctrl+1)"><i class="ic ic-raid"></i><span>Рейд</span></button>
@@ -53,7 +53,7 @@
       <div class="hud hud-maps" id="mapStrip" aria-label="Карты"></div>
 
       <div class="hud hud-layers">
-        <label class="switch follow" title="Переключать карту и выходы ЧВК/Диких, когда игра загружает рейд"><input type="checkbox" id="mapFollow" checked><span></span>следовать за игрой</label>
+        <label class="switch follow" title="Переключать карту и выходы ЧВК/Диких, когда игра загружает рейд"><input type="checkbox" id="mapFollow" checked><span></span>Следовать за игрой</label>
         <div class="chips" id="layerChips">
           <button data-layer="quests" class="chip on" title="Точки активных квестов">Задачи</button>
           <button data-layer="avail" class="chip" title="Точки квестов, которые можно взять">Можно взять</button>
@@ -62,8 +62,9 @@
           <button data-layer="transits" class="chip on">Переходы</button>
           <button data-layer="spawnPmc" class="chip" title="Точки появления ЧВК">Спавн ЧВК</button>
           <button data-layer="spawnScav" class="chip" title="Точки появления Диких">Спавн Диких</button>
+          <button data-layer="bosses" class="chip on" title="Где появляются боссы и с каким шансом">Боссы</button>
           <button data-layer="locks" class="chip" title="Все запертые двери">Двери</button>
-          <button data-layer="labels" class="chip on">Подписи</button>
+          <button data-layer="labels" class="chip on" title="Названия мест и выходов">Названия</button>
         </div>
       </div>
 
@@ -97,7 +98,7 @@
         <button class="hbtn" id="btnMe" title="Моя позиция (по скриншоту)"><i class="ic ic-me"></i></button>
         <button class="hbtn" id="btnLegend" title="Что значат значки на карте"><i class="ic ic-help"></i></button>
       </div>
-      <div class="legend hidden" id="legend"></div>
+      <div class="map-legend hidden" id="legend"></div>
       <a class="map-credit" id="mapCredit" href="https://github.com/Naki-404" data-ext title="GitHub разработчика">made by <b>NakiDev</b></a>
     </section>
 

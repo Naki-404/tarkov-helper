@@ -8,7 +8,7 @@ const path = require('path');
 
 const BASE = 'https://json.tarkov.dev';
 const STALE_MS = 12 * 60 * 60 * 1000; // данные старше 12 часов обновляются в фоне (база ~20 МБ)
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 7;
 
 const TRANSLATE_KEYS = new Set(['name', 'shortName', 'description', 'exitName', 'targetNames', 'exitStatus',
   'effects', 'bodyParts', 'zoneName', 'Nickname', 'customizationTypeName']);
@@ -88,12 +88,44 @@ function buildTasks(raw, tr) {
   }));
 }
 
+// сколько охраны может прийти с боссом (максимум по всем вариантам)
+const escortsMax = (b) => (b.escorts || []).reduce((s, e) => s + Math.max(0, ...(e.amount || []).map((a) => a.count || 0)), 0);
+
+// боссы карты: один на моба (дубли сливаются), шанс и охрана — максимум, точки — без повторов
+// точки: свои у места появления, иначе точки «boss» в зоне, иначе любые точки зоны
+function mapBosses(m, mobs) {
+  const spawns = (m.spawns || []).filter((s) => s.position);
+  const out = new Map();
+  for (const b of m.bosses || []) {
+    const mob = b.mob || b.boss || b.name;
+    if (!mob) continue;
+    const positions = [];
+    for (const loc of b.spawnLocations || []) {
+      const zone = spawns.filter((s) => s.zoneName === loc.spawnKey);
+      const spots = loc.positions?.length ? loc.positions
+        : zone.filter((s) => (s.categories || []).includes('boss')).map((s) => s.position);
+      positions.push(...(spots.length ? spots : zone.map((s) => s.position)));
+    }
+    let e = out.get(mob);
+    if (!e) out.set(mob, e = { name: mobs[mob]?.name || mob, spawnChance: 0, escorts: 0, positions: [], seen: new Set() });
+    e.spawnChance = Math.max(e.spawnChance, b.spawnChance || 0);
+    e.escorts = Math.max(e.escorts, escortsMax(b));
+    for (const p of positions.map(pos).filter(Boolean)) {
+      const k = `${p.x},${p.y},${p.z}`;
+      if (!e.seen.has(k)) { e.seen.add(k); e.positions.push(p); }
+    }
+  }
+  return [...out.values()].map(({ seen, ...e }) => e);
+}
+
 function buildMaps(raw, tr, enDict = {}) {
   const maps = Object.values(raw.maps);
   // английские названия выходов и переходов (до перевода) — по ним ищутся скриншоты на вики
   for (const m of maps) {
     for (const e of m.extracts || []) e._en = enDict[e.name] || e.name;
     for (const t of m.transits || []) t._en = enDict[t.description] || t.description;
+    // боссы — до перевода: zoneName точек переводится, а spawnKey нет
+    m._bosses = mapBosses(m, raw.mobs || {});
   }
   tr.walk(maps);
   return maps.map((m) => ({
@@ -101,7 +133,7 @@ function buildMaps(raw, tr, enDict = {}) {
     extracts: (m.extracts || []).map((e) => ({ name: e.name, en: e._en, faction: e.faction, position: pos(e.position), outline: e.outline?.map(pos), top: e.top, bottom: e.bottom, switch: !!e.switch })),
     transits: (m.transits || []).map((t) => ({ description: t.description, en: t._en, position: pos(t.position), top: t.top, bottom: t.bottom })),
     locks: (m.locks || []).filter((l) => l.key).map((l) => ({ key: l.key, lockType: l.lockType, needsPower: l.needsPower, position: pos(l.position) })),
-    bosses: (m.bosses || []).map((b) => ({ name: b.name || b.boss, spawnChance: b.spawnChance })),
+    bosses: m._bosses, // имена переведены walk выше
     // точки появления игроков: ЧВК и Дикие (боты не нужны)
     // у tarkov.dev старт ЧВК — категория только player (сторона pmc или all), зона Диких — scav + player вместе с ботами
     spawns: (m.spawns || []).filter((s) => s.position && (s.categories || []).includes('player')).map((s) => {

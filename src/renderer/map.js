@@ -10,6 +10,7 @@ export const ICON = {
   // переход: две встречные стрелки
   transit: '<svg viewBox="0 0 24 24"><path d="M8,10V13H14V18H8V21L2,15.5L8,10M22,8.5L16,3V6H10V11H16V14L22,8.5Z"/></svg>',
   // спавн: человек
+  boss: '<svg viewBox="0 0 24 24"><path d="M12,2A9,9 0 0,0 3,11C3,14.03 4.53,16.82 7,18.47V22H9V19H11V22H13V19H15V22H17V18.46C19.47,16.81 21,14 21,11A9,9 0 0,0 12,2M8,11A2,2 0 0,1 10,13A2,2 0 0,1 8,15A2,2 0 0,1 6,13A2,2 0 0,1 8,11M16,11A2,2 0 0,1 18,13A2,2 0 0,1 16,15A2,2 0 0,1 14,13A2,2 0 0,1 16,11M12,14L13.5,17H10.5L12,14Z"/></svg>',
   spawn: '<svg viewBox="0 0 24 24"><path d="M12,2A2,2 0 0,1 14,4A2,2 0 0,1 12,6A2,2 0 0,1 10,4A2,2 0 0,1 12,2M10.5,7H13.5A2,2 0 0,1 15.5,9V14.5H14V22H10V14.5H8.5V9A2,2 0 0,1 10.5,7Z"/></svg>',
 };
 
@@ -59,7 +60,7 @@ export class TarkovMap {
     this.def = null;
     this.style = 'svg';
     this.floor = '';
-    this.layersOn = { avail: false, quests: true, pmc: true, scav: false, transits: true, locks: false, labels: true, spawnPmc: false, spawnScav: false };
+    this.layersOn = { avail: false, quests: true, pmc: true, scav: false, transits: true, locks: false, labels: true, spawnPmc: false, spawnScav: false, bosses: true };
     this.groups = {};
     this.base = null;
     this.floorLayer = null;
@@ -104,7 +105,7 @@ export class TarkovMap {
       wheelPxPerZoomLevel: 90, minZoom: Math.max(0, (def.minZoom || 1) - 2), maxZoom, maxBounds: bounds.pad(0.5), maxBoundsViscosity: 0.6,
     });
     this.map.zoomControl.setPosition('topright');
-    for (const k of ['badges', 'spawnPmc', 'spawnScav', 'avail', 'quests', 'questLocks', 'pmc', 'scav', 'transits', 'locks', 'labels', 'me']) this.groups[k] = L.layerGroup();
+    for (const k of ['badges', 'spawnPmc', 'spawnScav', 'avail', 'quests', 'questLocks', 'pmc', 'scav', 'transits', 'bosses', 'locks', 'labels', 'me']) this.groups[k] = L.layerGroup();
     for (const [k, g] of Object.entries(this.groups)) {
       const on = k === 'me' || k === 'badges' || (k === 'questLocks' ? this.layersOn.quests : this.layersOn[k]);
       if (on) g.addTo(this.map);
@@ -503,6 +504,7 @@ export class TarkovMap {
     if (!this.map) return;
     const list = key === 'quests' ? [this.groups.quests, this.groups.questLocks] : [this.groups[key]];
     for (const g of list) { if (!g) continue; if (on) g.addTo(this.map); else g.remove(); }
+    if (key === 'labels') this.el.classList.toggle('no-names', !on); // подписи мест и названия выходов — одним переключателем
     if (on) this.applyFloorToMarkers();
   }
 
@@ -524,14 +526,14 @@ export class TarkovMap {
     const m = this.mapData;
     const def = this.def;
     if (!this.map) return;
-    for (const k of ['pmc', 'scav', 'transits', 'locks', 'labels', 'spawnPmc', 'spawnScav']) this.groups[k].clearLayers();
+    for (const k of ['pmc', 'scav', 'transits', 'bosses', 'locks', 'labels', 'spawnPmc', 'spawnScav']) this.groups[k].clearLayers();
     const tip = { className: 'tt tt-x', direction: 'auto', offset: [14, 0], opacity: 1 };
     if (m) {
       for (const e of m.extracts || []) {
         if (!e.position) continue;
         const kind = e.faction === 'scav' ? 'scav' : e.faction === 'shared' ? 'shared' : 'pmc';
         const make = () => {
-          const icon = L.divIcon({ className: 'mk', iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="mk-x ${kind}">${ICON.exit}</div>` });
+          const icon = L.divIcon({ className: 'mk', iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="mk-x ${kind}" style="position:relative">${ICON.exit}<span class="mk-xl">${esc(e.name)}</span></div>` });
           const mk = L.marker(pos(e.position), { icon, height: this.heightOpt(e.position, e.top, e.bottom), riseOnHover: true });
           mk.bindTooltip(() => this.exitTooltip(e, kind), tip);
           mk.on('click', () => this.onExitClick?.(e, kind));
@@ -542,7 +544,7 @@ export class TarkovMap {
       }
       for (const t of m.transits || []) {
         if (!t.position) continue;
-        const icon = L.divIcon({ className: 'mk', iconSize: [24, 24], iconAnchor: [12, 12], html: `<div class="mk-tr">${ICON.transit}</div>` });
+        const icon = L.divIcon({ className: 'mk', iconSize: [24, 24], iconAnchor: [12, 12], html: `<div class="mk-trw"><div class="mk-tr">${ICON.transit}</div><span class="mk-xl">${esc(t.description || 'Переход')}</span></div>` });
         const mk = L.marker(pos(t.position), { icon, height: this.heightOpt(t.position, t.top, t.bottom), riseOnHover: true });
         mk.bindTooltip(() => this.exitTooltip(t, 'transit'), tip);
         mk.on('click', () => this.onExitClick?.(t, 'transit'));
@@ -553,6 +555,21 @@ export class TarkovMap {
         const mk = L.marker(pos(s.position), { icon, height: this.heightOpt(s.position) })
           .bindTooltip(s.side === 'pmc' ? 'Спавн ЧВК' : 'Спавн Диких', { className: 'tt', direction: 'top', offset: [0, -8] });
         (s.side === 'pmc' ? this.groups.spawnPmc : this.groups.spawnScav).addLayer(mk);
+      }
+      // боссы: точка на каждом месте появления, бирка с именем и шансом — у самого центрального
+      for (const b of m.bosses || []) {
+        const pts = (b.positions || []).filter(Boolean);
+        if (!b.name || !pts.length || !(b.spawnChance > 0) || /^(bear|usec|чвк)$/i.test(b.name)) continue; // боты ЧВК — не боссы
+        const chance = Math.round(b.spawnChance * 100);
+        const tip = `${b.name} · ${chance}%${b.escorts ? ` · охрана до ${b.escorts}` : ''}`;
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length, cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+        const main = pts.reduce((best, p) => (Math.hypot(p.x - cx, p.z - cz) < Math.hypot(best.x - cx, best.z - cz) ? p : best), pts[0]);
+        for (const p of pts) {
+          const html = p === main ? `<div class="mk-boss">${ICON.boss}${esc(b.name)}<em>${chance}%</em></div>` : '<div class="mk-boss pt"></div>';
+          const icon = L.divIcon({ className: 'mk', iconSize: [0, 0], html });
+          this.groups.bosses.addLayer(L.marker(pos(p), { icon, height: this.heightOpt(p), zIndexOffset: -200 })
+            .bindTooltip(tip, { className: 'tt', direction: 'top', offset: [0, -10] }));
+        }
       }
     }
     for (const lb of def.labels || []) {
@@ -615,7 +632,7 @@ export class TarkovMap {
       const grp = p.avail ? this.groups.avail : this.groups.quests;
       // зона, где засчитывается условие, — тонкий пунктир почти без заливки
       if (p.outline?.length > 2) {
-        grp.addLayer(L.polygon(p.outline.map(pos), { className: 'qzone', color: p.avail ? '#8B5CF6' : p.done ? '#34D399' : '#2DD4EE', weight: 1, opacity: 0.75, dashArray: '4 4', fillOpacity: 0.05, interactive: false, height: h }));
+        grp.addLayer(L.polygon(p.outline.map(pos), { className: 'qzone', color: p.avail ? '#A3A094' : p.done ? '#8BAF73' : '#E0A43C', weight: 1, opacity: 0.75, dashArray: '4 4', fillOpacity: 0.05, interactive: false, height: h }));
       }
       const state = p.avail ? 'avail' : p.done ? 'done' : p.tracked ? 'tracked' : 'active';
       const isItem = p.kind === 'item';
@@ -624,10 +641,10 @@ export class TarkovMap {
         html: `<div class="mq ${state}${isItem ? ' item' : ''}"><b>${esc(p.n ?? '')}</b><i class="mq-t t-${esc(p.type || 'visit')}"></i></div>` });
       const mk = L.marker(pos(p.position), { icon, height: h, riseOnHover: true, zIndexOffset: p.tracked ? 500 : 0 });
       mk.bindTooltip(() => this.questTooltip(p), { className: 'tt tt-q', direction: 'auto', offset: [14, 0], opacity: 1 });
-      mk.bindPopup(() => `<div class="pop-title">${esc(p.title)}</div><div class="pop-sub">${esc(p.sub)}</div><div>${esc(p.text)}</div>
+      mk.bindPopup(() => this.questCard?.(p) || `<div class="pop-title">${esc(p.title)}</div><div class="pop-sub">${esc(p.sub)}</div><div>${esc(p.text)}</div>
         <div class="btnrow">${p.avail ? '<span class="tag st-available">можно взять</span>' : `<button class="btn sm" data-act="toggleObj" data-id="${esc(p.objectiveId)}">${p.done ? 'Снять отметку' : 'Выполнено'}</button>`}
         ${(this.shotsFor?.(p.taskId) || []).length ? `<button class="btn sm" data-act="shots" data-id="${esc(p.taskId)}">Фото места</button>` : ''}
-        <button class="btn sm" data-act="openTask" data-id="${esc(p.taskId)}">В досье</button></div>`, { maxWidth: 300 });
+        <button class="btn sm" data-act="openTask" data-id="${esc(p.taskId)}">В досье</button></div>`, { maxWidth: 320, autoPanPaddingTopLeft: L.point(330, 200), autoPanPaddingBottomRight: L.point(410, 90) }); // не под панелями и рядом слоёв
       grp.addLayer(mk);
       if (!this.taskMarkers.has(p.taskId)) this.taskMarkers.set(p.taskId, []);
       this.taskMarkers.get(p.taskId).push(mk);

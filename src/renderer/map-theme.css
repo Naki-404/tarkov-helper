@@ -1,80 +1,77 @@
-/* Тема векторной карты Tarkov Helper. Геометрия — assets/maps/*.svg, цвета и обводки — здесь.
+/* Тема векторной карты: полевая карта под фонарём. Земля оливковая, бетон и здания светлые, чтобы план читался с одного взгляда.
+   Геометрия — assets/maps/*.svg, цвета и обводки — здесь.
    Классы фигур в SVG: land, trees, water, rock, cement, tarmac, gravel, building, floor, locked, stairs, fence, road_*, … */
 
-.th-svg .land { fill: #0E1A1F !important; }
-.th-svg .trees, .th-svg .wood, .th-svg .green, .th-svg .forest { fill: #10262A !important; }
-.th-svg .water { fill: #0F2C44 !important; }
-.th-svg .rock { fill: #263039 !important; }
-.th-svg .cement, .th-svg .structure { fill: #222C37 !important; }
-.th-svg .tarmac { fill: #2B3541 !important; }
-.th-svg .gravel { fill: #2E2A24 !important; }
-.th-svg .building { fill: #16202B !important; stroke: #2DD4EE !important; stroke-opacity: .25 !important; stroke-width: .6px !important; }
-.th-svg .floor { fill: #1E2B38 !important; stroke: #2DD4EE !important; stroke-opacity: .45 !important; stroke-width: .5px !important; }
-.th-svg .locked { fill: #2A1E28 !important; stroke: #F87171 !important; stroke-opacity: .5 !important; stroke-width: .5px !important; }
-.th-svg .wall { fill: #7FA3B8 !important; }
-.th-svg .stairs { fill: #F2B544 !important; }
-.th-svg .road_tarmac { stroke: #36424F !important; }
-.th-svg .road_gravel { stroke: #3D3529 !important; }
-.th-svg .railroad { stroke: #5A4034 !important; }
-.th-svg .fence { stroke: #2F4A48 !important; }
-.th-svg .powerline { stroke: #4A4421 !important; }
-.th-svg .danger, .th-svg .danger_small { fill: #F87171 !important; fill-opacity: .14 !important; stroke: #F87171 !important; stroke-opacity: .55 !important; }
-.th-svg .map_border { stroke: #2DD4EE !important; stroke-opacity: .35 !important; }
-.th-svg .misc, .th-svg .chopper, .th-svg .plane { fill: #2B3541 !important; }
+.th-svg .land { fill: #283025 !important; }
+.th-svg .trees, .th-svg .wood, .th-svg .green, .th-svg .forest { fill: #222A1F !important; }
+.th-svg .water { fill: #2C4452 !important; }
+.th-svg .rock { fill: #3B3D35 !important; }
+.th-svg .cement, .th-svg .structure { fill: #3E413A !important; }
+.th-svg .tarmac { fill: #474942 !important; }
+.th-svg .gravel { fill: #4A4537 !important; }
+.th-svg .building { fill: #A7A393 !important; stroke: #1B1C18 !important; stroke-opacity: .7 !important; stroke-width: .6px !important; }
+.th-svg .floor { fill: #BDB8A7 !important; stroke: #2A2B26 !important; stroke-opacity: .7 !important; stroke-width: .5px !important; }
+.th-svg .floor.dark { fill: #8F8B7D !important; }
+.th-svg .locked { fill: #B4877B !important; stroke: #5A2E25 !important; stroke-opacity: .7 !important; stroke-width: .5px !important; }
+.th-svg .wall { fill: #2A2B26 !important; }
+.th-svg .stairs { fill: #E0A43C !important; }
+.th-svg .door { fill: #E0A43C !important; fill-opacity: .9 !important; }
+.th-svg .road_tarmac { stroke: #50524B !important; }
+.th-svg .road_gravel { stroke: #5C5342 !important; }
+.th-svg .railroad { stroke: #6E5745 !important; }
+.th-svg .fence { stroke: #61655A !important; }
+.th-svg .powerline { stroke: #6D6649 !important; }
+.th-svg .danger, .th-svg .danger_small { fill: #CC6A55 !important; fill-opacity: .2 !important; stroke: #CC6A55 !important; stroke-opacity: .7 !important; }
+.th-svg .map_border { stroke: #E8E5DA !important; stroke-opacity: .3 !important; }
+.th-svg .misc, .th-svg .chopper, .th-svg .plane { fill: #55574F !important; }
+.th-svg .line { fill: none !important; stroke: #2A2B26 !important; stroke-width: .8px !important; }
+.th-svg .line.dashed { stroke-dasharray: 3 2; stroke: #E0A43C !important; stroke-opacity: .6 !important; }
 .th-svg .shadow { filter: none !important; }
 
-/* выбранный этаж здания — свой оттенок, чтобы сразу было видно */
-.th-svg .th-active .floor { fill: #17465A !important; stroke: #67E8F9 !important; stroke-opacity: .95 !important; stroke-width: .8px !important; }
-.th-svg .th-active .building { fill: #133A4B !important; stroke: #67E8F9 !important; stroke-opacity: .9 !important; }
-.th-svg .th-active .locked { fill: #3D2230 !important; stroke: #F87171 !important; stroke-opacity: .9 !important; }
+/* выбранный этаж: тёплая бумага с янтарной кромкой */
+.th-svg .th-active .floor { fill: #E3DAC2 !important; stroke: #E0A43C !important; stroke-opacity: .9 !important; stroke-width: .7px !important; }
+.th-svg .th-active .floor.dark { fill: #C2B89C !important; }
+.th-svg .th-active .building { fill: #D2C9B1 !important; stroke: #1B1C18 !important; stroke-opacity: .8 !important; }
+.th-svg .th-active .locked { fill: #C99383 !important; stroke: #5A2E25 !important; stroke-opacity: .9 !important; }
 /* под выбранным этажом основа затемняется */
-.th-svg .th-dim-shape * { fill: #03060A !important; fill-opacity: .72 !important; stroke: none !important; }
+.th-svg .th-dim-shape * { fill: #10110F !important; fill-opacity: .72 !important; stroke: none !important; }
 /* этаж на всю карту: основа приглушена, чтобы читались коридоры и стены выбранного этажа */
-.th-svg .base-layer.th-off { opacity: .3; filter: grayscale(.5) brightness(.75); }
-
-/* Лаборатория: фигуры размечены классами по исходным цветам (assets/maps/Labs.svg) */
-.th-svg .floor.dark { fill: #162029 !important; }
-.th-svg .th-active .floor.dark { fill: #113645 !important; }
-.th-svg .door { fill: #F2B544 !important; fill-opacity: .8 !important; }
-.th-svg .line { fill: none !important; stroke: #3B4A58 !important; stroke-width: .8px !important; }
-.th-svg .line.dashed { stroke-dasharray: 3 2; stroke: #67E8F9 !important; stroke-opacity: .5 !important; }
+.th-svg .base-layer.th-off { opacity: .35; filter: grayscale(.6) brightness(.7); }
 
 /* здания: точный контур при наведении */
 .th-svg { pointer-events: none; }
 .th-svg .th-bld * { fill: transparent !important; stroke: transparent !important; pointer-events: all; cursor: pointer; vector-effect: non-scaling-stroke; }
-.th-svg .th-bld.hover * { fill: rgba(45, 212, 238, .08) !important; stroke: #2DD4EE !important; stroke-width: 1.5px !important; stroke-dasharray: 4 3; }
-.th-svg .th-bld.active * { stroke: #F2B544 !important; stroke-width: 1.5px !important; stroke-dasharray: none; }
-.th-svg .th-bld.active.hover * { fill: rgba(242, 181, 68, .08) !important; }
+.th-svg .th-bld.hover * { fill: rgba(232, 229, 218, .1) !important; stroke: #E8E5DA !important; stroke-width: 1.5px !important; stroke-dasharray: 4 3; }
+.th-svg .th-bld.active * { stroke: #E0A43C !important; stroke-width: 1.5px !important; stroke-dasharray: none; }
+.th-svg .th-bld.active.hover * { fill: rgba(224, 164, 60, .1) !important; }
 
-/* плитки там, где вектора нет (Лабиринт, Ледокол), — приглушены под общую тему */
-.leaflet-tile-pane .th-tiles { filter: saturate(.35) brightness(.78) contrast(1.08); }
-.leaflet-tile-pane .th-sat { filter: saturate(.75) brightness(.9); }
+/* плитки там, где вектора нет (Лабиринт, Ледокол), — в той же гамме */
+.leaflet-tile-pane .th-tiles { filter: saturate(.5) sepia(.15) brightness(.85) contrast(1.05); }
+.leaflet-tile-pane .th-sat { filter: saturate(.7) brightness(.9); }
 
-/* плашка этажа на здании */
+/* плашка этажа на здании — бирка */
 .fbadge { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
-  font: 700 11px "Cascadia Mono", Consolas, monospace; letter-spacing: .6px; text-transform: uppercase;
-  color: #F2B544; background: rgba(5, 9, 12, .9); border: 1px solid #F2B544; border-radius: 3px; padding: 1px 7px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .6); }
+  font: 600 12px var(--ui); color: #E0A43C; background: rgba(16, 17, 15, .94); border: 1.5px solid #E0A43C; border-radius: 4px; padding: 0 8px; line-height: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
 
-/* зона, где засчитывается условие задания, — тонкий пунктир */
+/* зона, где засчитывается условие, — тонкий пунктир */
 path.qzone { pointer-events: none; }
 
-/* метка задания: круг с номером и значком типа условия */
-.mq { position: relative; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
-  background: #071116; border: 2px solid #2DD4EE; box-shadow: 0 0 0 3px rgba(45, 212, 238, .16), 0 2px 6px rgba(0, 0, 0, .7);
-  font: 700 11px "Cascadia Mono", Consolas, monospace; color: #E6EDF3; transition: transform .12s; }
-.mq b { line-height: 1; }
-.mq.tracked { border-color: #F2B544; box-shadow: 0 0 0 3px rgba(242, 181, 68, .2), 0 2px 6px rgba(0, 0, 0, .7); }
-.mq.done { border-color: #34D399; opacity: .55; }
-.mq.avail { width: 16px; height: 16px; border-color: #8B5CF6; border-style: dashed; font-size: 0; background: rgba(20, 10, 40, .85); }
-.mq.item { width: 18px; height: 18px; border-radius: 3px; transform: rotate(45deg); border-color: #FCD34D; font-size: 0; }
-.mq.item .mq-t { transform: rotate(-45deg); position: static; width: 10px; height: 10px; background: #FCD34D; border: 0; }
-.mq-t { position: absolute; right: -6px; top: -6px; width: 13px; height: 13px; border-radius: 50%; background: #2DD4EE; border: 1.5px solid #071116;
-  -webkit-mask: none; }
-.mq.tracked .mq-t { background: #F2B544; }
-.mq.done .mq-t { background: #34D399; }
+/* метка задания — бирка с номером (та же, что в списке задач), в углу — значок типа условия */
+.mq { position: relative; min-width: 24px; height: 20px; padding: 0 4px; border-radius: 4px; display: grid; place-items: center;
+  background: #10110F; border: 1.5px solid #E0A43C; box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+  font: 600 12px var(--mono); color: #E0A43C; transition: transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease); }
+.mq b { line-height: 1; font-weight: 600; }
+.mq.tracked { background: #E0A43C; color: #1A1206; }
+.mq.done { border-color: #8BAF73; color: #8BAF73; opacity: .6; }
+.mq.avail { min-width: 14px; width: 14px; height: 14px; padding: 0; border: 1.5px dashed #A3A094; font-size: 0; background: rgba(16, 17, 15, .85); }
+.mq.item { min-width: 16px; width: 16px; height: 16px; padding: 0; transform: rotate(45deg); border-radius: 3px; font-size: 0; }
+.mq.item .mq-t { transform: rotate(-45deg); position: static; width: 10px; height: 10px; background: #E0A43C; border: 0; border-radius: 0; }
+.mq.item.tracked .mq-t { background: #1A1206; }
+.mq-t { position: absolute; right: -7px; top: -7px; width: 13px; height: 13px; border-radius: 3px; background: #E0A43C; border: 1.5px solid #10110F; }
+.mq.done .mq-t { background: #8BAF73; }
 .mq.avail .mq-t { display: none; }
-.mq-t::after { content: ""; position: absolute; inset: 2px; background: #071116;
+.mq-t::after { content: ""; position: absolute; inset: 1.5px; background: #10110F;
   -webkit-mask: var(--g) center / contain no-repeat; mask: var(--g) center / contain no-repeat; }
 .mq.item .mq-t::after { inset: 0; }
 .t-visit { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5Z'/%3E%3C/svg%3E"); }
@@ -83,20 +80,39 @@ path.qzone { pointer-events: none; }
 .t-findQuestItem, .t-findItem, .t-giveQuestItem, .t-giveItem { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3Z'/%3E%3C/svg%3E"); }
 .t-shoot { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13Z'/%3E%3C/svg%3E"); }
 .t-useItem, .t-extract, .t-experience, .t-buildWeapon { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,7V13H13V7H11M11,15V17H13V15H11Z'/%3E%3C/svg%3E"); }
-#map.hovering .mq:not(.hl) { opacity: .25; }
-.mq.hl, .mq.focus { animation: mqpop .9s ease 2; }
-@keyframes mqpop { 50% { transform: scale(1.4); } }
-.mq.item.hl, .mq.item.focus { animation: none; box-shadow: 0 0 0 5px rgba(252, 211, 77, .4); }
+#map.hovering .mq:not(.hl) { opacity: .3; }
+.mq.hl, .mq.focus { transform: scale(1.25); }
+.mq.item.hl, .mq.item.focus { transform: rotate(45deg) scale(1.25); }
 
-/* переход: шестиугольник со встречными стрелками */
-.mk-tr { width: 24px; height: 24px; display: grid; place-items: center; background: #8B5CF6;
-  clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); transition: transform .12s; }
-.mk-tr::before { content: ""; position: absolute; inset: 2px; background: #170C2E; clip-path: inherit; }
-.mk-tr svg { width: 14px; height: 14px; fill: #DDD6FE; position: relative; }
-.mk-tr:hover { transform: scale(1.2); }
+/* выходы: квадрат цвета фракции и подпись рядом, как на бумажной карте */
+.mk-x { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; border: 1.5px solid var(--fc); background: rgba(16, 17, 15, .94);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .6); transition: transform var(--t-fast) var(--ease); }
+.mk-x svg { width: 12px; height: 12px; fill: var(--fc); }
+.mk-x:hover { transform: scale(1.15); }
+.mk-x.pmc { --fc: #8BAF73; } .mk-x.scav { --fc: #C9B98F; } .mk-x.shared { --fc: #8FB0C4; }
+.mk-xl { position: absolute; left: 24px; top: 50%; transform: translateY(-50%); white-space: nowrap; pointer-events: none;
+  font: 600 12px var(--ui); color: var(--fc); text-shadow: 0 0 2px #0D0E0C, 0 0 4px #0D0E0C, 0 1px 2px #0D0E0C; }
+.mk-xw { position: relative; }
+#map.no-names .mk-xl { display: none; }
+
+/* переход: светлая шестигранная бирка со встречными стрелками */
+.mk-tr { position: relative; width: 22px; height: 22px; display: grid; place-items: center; background: #E8E5DA;
+  clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); transition: transform var(--t-fast) var(--ease); }
+.mk-tr::before { content: ""; position: absolute; inset: 2px; background: #10110F; clip-path: inherit; }
+.mk-tr svg { width: 12px; height: 12px; fill: #E8E5DA; position: relative; }
+.mk-tr:hover { transform: scale(1.15); }
+.mk-trw { position: relative; }
+.mk-trw .mk-xl { --fc: #E8E5DA; left: 26px; }
 
 /* спавны */
-.mk-sp { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; background: rgba(5, 10, 12, .85); border: 1.5px solid; opacity: .9; }
-.mk-sp svg { width: 11px; height: 11px; }
-.mk-sp.pmc { border-color: #2DD4EE; } .mk-sp.pmc svg { fill: #2DD4EE; }
-.mk-sp.scav { border-color: #F2B544; } .mk-sp.scav svg { fill: #F2B544; }
+.mk-sp { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; background: rgba(16, 17, 15, .85); border: 1.5px solid; opacity: .9; }
+.mk-sp svg { width: 9px; height: 9px; }
+.mk-sp.pmc { border-color: #8BAF73; } .mk-sp.pmc svg { fill: #8BAF73; }
+.mk-sp.scav { border-color: #C9B98F; } .mk-sp.scav svg { fill: #C9B98F; }
+
+/* боссы: красная бирка с шансом */
+.mk-boss { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px 0 4px; border-radius: 4px; background: rgba(16, 17, 15, .94);
+  border: 1.5px solid #CC6A55; color: #E8E5DA; font: 600 11px var(--ui); white-space: nowrap; transform: translate(-50%, -50%); position: absolute; box-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+.mk-boss svg { width: 12px; height: 12px; fill: #CC6A55; flex: none; }
+.mk-boss em { font: 400 11px var(--mono); font-style: normal; color: #CC6A55; }
+.mk-boss.pt { width: 10px; height: 10px; padding: 0; border-radius: 50%; background: #CC6A55; border: 1.5px solid #10110F; }

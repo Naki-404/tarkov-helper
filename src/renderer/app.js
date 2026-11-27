@@ -444,7 +444,7 @@ function renderRaid() {
   const info = [];
   if (m?.raidDuration) info.push(`${m.raidDuration} мин`);
   if (m?.players) info.push(`${m.players} игроков`);
-  const bosses = (m?.bosses || []).filter((b) => b.name && b.spawnChance > 0).map((b) => `${b.name} ${Math.round(b.spawnChance * 100)}%`);
+  const bosses = (m?.bosses || []).filter((b) => b.name && b.spawnChance > 0 && !/^(bear|usec|чвк)$/i.test(b.name)).map((b) => `${b.name} ${Math.round(b.spawnChance * 100)}%`);
   if (bosses.length) info.push(bosses.slice(0, 2).join(', '));
   $('#briefInfo').textContent = info.join(' · ');
   $$('#briefTabs button').forEach((b) => b.classList.toggle('on', b.dataset.brief === ui.brief));
@@ -460,9 +460,9 @@ function renderRaid() {
     return `<div class="grp${col ? ' collapsed' : ''}" data-group="${key}"><span class="chev"></span>${title} · ${list.length}</div>`
       + (col ? '' : list.map((t) => taskRow(t, { n: number.get(t.id), ids, ...opt })).join(''));
   };
-  let html = group('tracked', '★ Закреплённые', g.tracked) + group('here', 'На этой карте', g.onMap)
+  let html = group('tracked', 'Закреплённые', g.tracked) + group('here', 'На этой карте', g.onMap)
     + group('anywhere', 'На любой локации', g.anywhere) + group('avail', 'Можно взять здесь', g.avail, { avail: true });
-  if (!here.length && !g.tracked.length) html = '<div class="empty"><b>На этой карте активных задач нет</b>Возьми квест в игре — он появится здесь сам. ★ закрепит любой квест наверху.</div>' + html;
+  if (!here.length && !g.tracked.length) html = '<div class="empty"><b>На этой карте активных задач нет</b>Возьми квест в игре — он появится здесь сам. Звезда закрепит любой квест наверху.</div>' + html;
   setHtml($('#taskBody'), html);
 }
 
@@ -486,8 +486,8 @@ function taskRow(t, opt) {
       <div class="task-t"><div class="task-n">${esc(t.name)}</div><div class="task-m"><img src="${esc(tr.imageLink)}" alt="" loading="lazy">${esc(tr.name)} · ${esc(maps.slice(0, 2).join(', ') || 'любая карта')}${t.minPlayerLevel > 1 ? ` · ур. ${t.minPlayerLevel}` : ''}</div></div>
       ${st === 'active' && objs.length ? `<span class="task-p">${done}/${objs.length}</span>` : ''}
       ${camBtn(t.id, ui.raidMap)}
-      <button class="ibtn star${tracked ? ' on' : ''}" data-act="track" data-task="${t.id}" title="${tracked ? 'Открепить' : 'Закрепить наверху'}">★</button>
-      <button class="ibtn" data-act="dossier" data-task="${t.id}" title="Открыть в досье"><i class="ic ic-dossier" style="width:13px;height:13px"></i></button>
+      <button class="ibtn star${tracked ? ' on' : ''}" data-act="track" data-task="${t.id}" title="${tracked ? 'Открепить' : 'Закрепить наверху'}">${tracked ? '<i class="ic ic-star"></i>' : '<i class="ic ic-star-o"></i>'}</button>
+      <button class="ibtn" data-act="dossier" data-task="${t.id}" title="Открыть в досье"><i class="ic ic-dossier"></i></button>
     </div>${body}</div>`;
 }
 
@@ -516,8 +516,8 @@ function exitsHtml(m) {
     return `<div class="exit" data-focus='${esc(JSON.stringify(e.position))}' ${img ? `data-peekimg="${esc(img.thumb)}" data-peekcap="${esc(e.name)}"` : ''} title="Показать на карте"><i style="background:${color}"></i><span>${esc(e.name)}${req ? `<small class="exit-req">${esc(req)}</small>` : ''}</span>${img ? '<i class="ic ic-cam exit-cam"></i>' : ''}</div>`;
   };
   const sec = (title, list, color, note) => (list.length ? `<div class="grp static">${title} · ${list.length}</div>` + list.map((e) => row(e, color, note?.(e))).join('') : '');
-  return sec('ЧВК', by('pmc'), 'var(--ok)', (e) => (e.switch ? 'рубильник' : '')) + sec('Общие', by('shared'), 'var(--accent)', (e) => (e.switch ? 'рубильник' : ''))
-    + sec('Дикие', by('scav'), 'var(--amber)') + sec('Переходы', (m.transits || []).map((e) => ({ ...e, name: e.description })), 'var(--violet)') || '<div class="empty">Нет данных о выходах</div>';
+  return sec('ЧВК', by('pmc'), 'var(--ok)', (e) => (e.switch ? 'рубильник' : '')) + sec('Общие', by('shared'), 'var(--shared)', (e) => (e.switch ? 'рубильник' : ''))
+    + sec('Дикие', by('scav'), 'var(--scav)') + sec('Переходы', (m.transits || []).map((e) => ({ ...e, name: e.description })), 'var(--text)') || '<div class="empty">Нет данных о выходах</div>';
 }
 $('#briefBody').addEventListener('click', (e) => { const r = e.target.closest('[data-focus]'); if (r) tmap.focusPoint(JSON.parse(r.dataset.focus)); });
 $$('#briefTabs button').forEach((b) => b.addEventListener('click', () => { ui.brief = b.dataset.brief; saveUi(); render(); }));
@@ -551,12 +551,14 @@ $$('#layerChips .chip').forEach((b) => {
   });
 });
 $('#btnFit').addEventListener('click', () => tmap.fit());
+// ряд слоёв может перенестись на вторую строку — левая панель встаёт под него
+new ResizeObserver(([e]) => document.documentElement.style.setProperty('--hud-h', Math.round(e.contentRect.height) + 'px')).observe($('.hud-layers'));
 // легенда: те же разметка и стили, что у значков на карте
 const legendHtml = () => {
   const row = (icon, text) => `<div class="lgr"><i class="box">${icon}</i><span>${text}</span></div>`;
   return `<h4>Значки на карте</h4><div class="lg-grid">
-    ${row('<div class="mq"><b>3</b><i class="mq-t t-visit"></i></div>', 'Условие активного квеста, номер — как в списке задач; кружок — тип условия')}
-    ${row('<div class="mq tracked"><b>1</b><i class="mq-t t-findQuestItem"></i></div>', 'Закреплённый квест (★)')}
+    ${row('<div class="mq"><b>3</b><i class="mq-t t-visit"></i></div>', 'Условие активного квеста: номер — как в списке задач, значок в углу — тип условия')}
+    ${row('<div class="mq tracked"><b>1</b><i class="mq-t t-findQuestItem"></i></div>', 'Закреплённый квест')}
     ${row('<div class="mq done"><b>2</b></div>', 'Условие выполнено')}
     ${row('<div class="mq avail"></div>', 'Квест можно взять — его точка на этой карте')}
     ${row('<div class="mq item"><i class="mq-t"></i></div>', 'Предмет или место закладки')}
@@ -565,7 +567,8 @@ const legendHtml = () => {
     ${row(`<div class="mk-x scav">${ICON.exit}</div>`, 'Выход Диких')}
     ${row(`<div class="mk-x shared">${ICON.exit}</div>`, 'Общий выход')}
     ${row(`<div class="mk-tr">${ICON.transit}</div>`, 'Переход на другую карту')}
-    ${row(`<div class="mk-sp pmc">${ICON.spawn}</div>`, 'Спавн ЧВК (Диких — янтарный)')}
+    ${row(`<div class="mk-sp pmc">${ICON.spawn}</div>`, 'Спавн ЧВК (Диких — песочный)')}
+    ${row(`<div class="mk-boss" style="position:static;transform:none">${ICON.boss}<em>60%</em></div>`, 'Босс и шанс появления, точки — где он бывает')}
     ${row(`<div class="mk-lock need">${ICON.lock}</div>`, 'Дверь с ключом; подсвечена — ключ нужен для квеста')}
     ${row('<span class="lg-floor"></span>', 'Выбранный этаж')}
     ${row('<span class="lg-dim"></span>', 'Другие этажи приглушены')}
@@ -608,8 +611,70 @@ tmap.onPopupAction = async (d) => {
   if (d.act === 'shots') openLightbox(d.id, 0, ui.raidMap);
 };
 
+// ---------------------------------------------------------------- данные с вики: подсказки, сюжетные главы, ивенты
+let extras = { hints: {}, quests: [] };
+api.getExtras?.().then((x) => { if (x) { extras = x; render(); } });
+api.onExtras?.((x) => { if (x) { extras = x; render(); } });
+const hintsOf = (id) => extras.hints?.[id] || null;
+function hintsHtml(t) {
+  const h = hintsOf(t.id);
+  if (!h) return '';
+  const pve = S.state?.dataInfo?.mode === 'pve' ? (h.pve || []) : [];
+  const list = [...(h.requirements || []).map((x) => 'Требование: ' + x), ...(h.details || []), ...pve.map((x) => 'PvE: ' + x)];
+  return list.length ? `<div class="dt-sec"><div class="panel-title">Подсказки с вики</div><ul class="hints">${list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+}
+// отметки шагов сюжета: в логи игры они не пишутся, храним у себя
+let storyDone = {};
+try { storyDone = JSON.parse(localStorage.getItem('story-done') || '{}'); } catch {}
+const saveStory = () => { try { localStorage.setItem('story-done', JSON.stringify(storyDone)); } catch {} };
+const storyPct = (q) => { const o = q.objectives.filter((x) => !x.optional); return o.length ? o.filter((x) => storyDone[q.id + ':' + x.id]).length / o.length : 0; };
+function renderStoryDetail(q) {
+  if (!q) { setHtml($('#qDetail'), '<div class="dt-empty"><div><span class="glyph big"></span><br><br>Выбери главу в списке</div></div>'); return; }
+  const done = (o) => !!storyDone[q.id + ':' + o.id];
+  const objs = q.objectives.map((o) => `<div class="obj${done(o) ? ' done' : ''}"><div class="ocheck" data-act="sobj" data-q="${esc(q.id)}" data-o="${esc(o.id)}" title="${done(o) ? 'Снять отметку' : 'Отметить выполненным'}"></div>
+    <div class="otext">${esc(o.text)}${o.optional ? ' <span class="oopt">(необязательно)</span>' : ''}${o.count > 1 ? ` <span class="oopt">×${o.count}</span>` : ''}${(o.details || []).map((d) => `<span class="ohint">${esc(d)}</span>`).join('')}</div></div>`).join('');
+  const kind = q.category === 'story' ? 'Сюжетная глава' : `Ивент${q.eventName ? ' · ' + q.eventName : ''}`;
+  setHtml($('#qDetail'), `
+    <div class="dt-head"><span class="glyph big"></span>
+      <div class="dt-title"><h2>${esc(q.name)}</h2>
+        <div class="dt-meta">${esc(kind)}${q.maps?.length ? ' · ' + esc(q.maps.join(', ')) : ''} <span class="tag story">${q.category === 'story' ? 'сюжет' : 'ивент'}</span></div>
+        <div class="dt-actions">${q.wikiUrl ? `<a class="btn sm" href="${esc(q.wikiUrl)}" data-ext style="display:inline-flex;align-items:center"><i class="ic ic-book"></i>Вики</a>` : ''}</div>
+        <div class="note">Шаги отмечаются вручную: в логах игры сюжетных глав нет. Текст — с английской вики.</div>
+      </div></div>
+    <div class="dt-sec"><div class="panel-title">Шаги · ${Math.round(storyPct(q) * 100)}%</div><div class="dt-obj">${objs}</div></div>
+    ${q.guide ? `<div class="dt-sec"><div class="panel-title">Как пройти</div><div class="guide">${esc(q.guide)}</div></div>` : ''}
+    ${q.rewards?.xp || q.rewards?.items?.length ? `<div class="dt-sec"><div class="panel-title">Награда</div><div class="rewards">${q.rewards.xp ? `<span class="tag">${fmt(q.rewards.xp)} опыта</span>` : ''}${(q.rewards.items || []).map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</div></div>` : ''}
+    <div class="attrib">Источник: ${esc(extras.source || 'Escape from Tarkov Wiki')}</div>`);
+}
+$('#qDetail').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-act="sobj"]');
+  if (!c) return;
+  const k = c.dataset.q + ':' + c.dataset.o;
+  if (storyDone[k]) delete storyDone[k]; else storyDone[k] = 1;
+  saveStory(); render();
+});
+
+// карточка квеста на карте: квест целиком — это условие выделено, остальные ниже, подсказки с вики
+tmap.questCard = (p) => {
+  const t = idx.task.get(p.taskId);
+  if (!t) return null;
+  const tr = trader(t.trader);
+  const objs = t.objectives.map((o) => {
+    const cls = o.id === p.objectiveId ? ' here' : objDone(t, o) ? ' done' : '';
+    return `<div class="qc-o${cls}"><i></i><div>${esc(objText(o))}${objCount(o) ? ` · ${objProgress(t, o)}/${objCount(o)}` : ''}</div></div>`;
+  }).join('');
+  const h = hintsOf(t.id);
+  const hints = (h?.details || []).slice(0, 3).map((d) => `<div class="qc-o"><i></i><div><small>${esc(d)}</small></div></div>`).join('');
+  const shotsN = shotsOn(t.id, ui.raidMap).length;
+  return `<div class="qc"><div class="qc-h"><img src="${esc(tr.imageLink)}" alt=""><div class="qc-t"><b>${esc(t.name)}</b><span>${esc(tr.name)}${t.minPlayerLevel > 1 ? ` · ур. ${t.minPlayerLevel}` : ''} · ${esc(ST_LABEL[statusOf(t.id)] || '')}</span></div></div>
+    <div class="qc-objs">${objs}${hints}</div>
+    <div class="btnrow">${p.avail ? '<span class="tag st-available">можно взять</span>' : `<button class="btn sm accent" data-act="toggleObj" data-id="${esc(p.objectiveId)}">${p.done ? 'Снять отметку' : 'Выполнено'}</button>`}
+      ${shotsN ? `<button class="btn sm" data-act="shots" data-id="${esc(t.id)}">Фото места · ${shotsN}</button>` : ''}
+      <button class="btn sm" data-act="openTask" data-id="${esc(t.id)}">В досье</button></div></div>`;
+};
+
 // ---------------------------------------------------------------- ДОСЬЕ
-const STATUSES = [['active', 'Активные'], ['tracked', '★ Закреплённые'], ['available', 'Можно взять'], ['locked', 'Закрытые'], ['complete', 'Выполненные'], ['all', 'Все квесты']];
+const STATUSES = [['active', 'Активные'], ['tracked', 'Закреплённые'], ['available', 'Можно взять'], ['locked', 'Закрытые'], ['complete', 'Выполненные'], ['all', 'Все квесты'], ['story', 'Сюжет и ивенты']];
 const stOk = (t) => ui.qStatus === 'all' || (ui.qStatus === 'tracked' ? isTracked(t.id) : statusOf(t.id) === ui.qStatus);
 function renderDossier() {
   const q = ui.qSearch.trim().toLowerCase();
@@ -625,6 +690,7 @@ function renderDossier() {
     const s = statusOf(t.id); sc[s] = (sc[s] || 0) + 1; sc.all = (sc.all || 0) + 1;
     if (isTracked(t.id)) sc.tracked = (sc.tracked || 0) + 1;
   }
+  sc.story = (extras.quests || []).filter((x) => !q || x.name.toLowerCase().includes(q)).length;
   setHtml($('#qStatusList'), STATUSES.map(([k, l]) => `<button class="fitem${ui.qStatus === k ? ' on' : ''}" data-st="${k}"><span>${l}</span><em>${sc[k] || 0}</em></button>`).join(''));
   const tc = new Map();
   for (const t of base) if (stOk(t)) tc.set(t.trader, (tc.get(t.trader) || 0) + 1);
@@ -632,6 +698,21 @@ function renderDossier() {
   setHtml($('#qTraderList'), `<button class="fitem${!ui.qTrader ? ' on' : ''}" data-tr=""><span>Все торговцы</span></button>` +
     trs.map((t) => `<button class="fitem${ui.qTrader === t.id ? ' on' : ''}${tc.get(t.id) ? '' : ' zero'}" data-tr="${t.id}"><img src="${esc(t.imageLink)}" alt="" loading="lazy"><span>${esc(t.name)}</span><em>${tc.get(t.id) || 0}</em></button>`).join(''));
 
+  // сюжетные главы и ивенты — свой список (данные вики, отметки вручную)
+  if (ui.qStatus === 'story') {
+    const sq = (extras.quests || []).filter((x) => !q || x.name.toLowerCase().includes(q));
+    $('#qListTitle').textContent = 'Сюжет и ивенты';
+    $('#qListCount').textContent = `${sq.length}`;
+    if (!sq.some((x) => x.id === ui.qSel)) ui.qSel = sq[0]?.id || null;
+    setHtml($('#qList'), sq.map((x) => {
+      const pct = Math.round(storyPct(x) * 100);
+      return `<div class="qrow${ui.qSel === x.id ? ' on' : ''}" data-task="${esc(x.id)}"><span class="glyph"></span>
+      <div class="qr-t"><div class="qr-n">${esc(x.name)}</div><div class="qr-m">${x.category === 'story' ? 'Сюжетная глава' : 'Ивент'}${x.maps?.length ? ' · ' + esc(x.maps[0]) : ''}</div></div>
+      ${pct ? `<span class="qr-p${pct === 100 ? ' full' : ''}">${pct}%</span>` : ''}</div>`;
+    }).join('') || '<div class="empty"><b>Пусто</b>Данные вики ещё не загружены</div>');
+    renderStoryDetail(sq.find((x) => x.id === ui.qSel));
+    return;
+  }
   const sorters = {
     trader: (a, b) => byTrader(a, b) || (a.minPlayerLevel || 0) - (b.minPlayerLevel || 0),
     level: (a, b) => (a.minPlayerLevel || 0) - (b.minPlayerLevel || 0) || byTrader(a, b),
@@ -647,7 +728,7 @@ function renderDossier() {
     const st = statusOf(t.id);
     const pct = Math.round(taskPct(t) * 100);
     return `<div class="qrow${ui.qSel === t.id ? ' on' : ''}" data-task="${t.id}"><img src="${esc(trader(t.trader).imageLink)}" alt="" loading="lazy">
-      <div class="qr-t"><div class="qr-n">${isTracked(t.id) ? '<span class="star-on">★</span> ' : ''}${esc(t.name)}</div><div class="qr-m"><i class="dot ${st}"></i>${esc(trader(t.trader).name)} · ${esc(mapNames(t)[0] || 'любая карта')}${t.minPlayerLevel > 1 ? ` · ур. ${t.minPlayerLevel}` : ''}</div></div>
+      <div class="qr-t"><div class="qr-n">${isTracked(t.id) ? '<span class="star-on"><i class="ic ic-star"></i></span> ' : ''}${esc(t.name)}</div><div class="qr-m"><i class="dot ${st}"></i>${esc(trader(t.trader).name)} · ${esc(mapNames(t)[0] || 'любая карта')}${t.minPlayerLevel > 1 ? ` · ур. ${t.minPlayerLevel}` : ''}</div></div>
       ${st === 'active' && t.objectives.length ? `<span class="qr-p${pct === 100 ? ' full' : ''}" title="Условий выполнено: ${pct}%">${t.objectives.filter((o) => !o.optional && objDone(t, o)).length}/${t.objectives.filter((o) => !o.optional).length}</span>` : ''}</div>`;
   }).join('') : `<div class="empty"><b>Пусто</b>${ui.qStatus === 'active' ? 'Активные квесты появляются сами, когда берёшь их в игре. Взятые до установки — отметь «Уже взят» во вкладке «Можно взять».' : 'Измени фильтры или поиск'}</div>`);
   renderQuestDetail(idx.task.get(ui.qSel));
@@ -697,7 +778,7 @@ function renderQuestDetail(t) {
       <div class="dt-title"><h2>${esc(t.name)}</h2>
         <div class="dt-meta">${esc(tr.name)} · ${esc(maps.join(', ') || 'любая карта')}${t.minPlayerLevel > 1 ? ` · с ${t.minPlayerLevel} ур.` : ''} ${tags}</div>
         <div class="dt-actions">
-          ${st !== 'complete' && st !== 'failed' ? `<button class="btn sm${tracked ? ' accent' : ''}" data-act="track" data-task="${t.id}">${tracked ? '★ Закреплён' : '☆ Закрепить'}</button>` : ''}
+          ${st !== 'complete' && st !== 'failed' ? `<button class="btn sm${tracked ? ' accent' : ''}" data-act="track" data-task="${t.id}">${tracked ? '<i class="ic ic-star"></i>Закреплён' : '<i class="ic ic-star-o"></i>Закрепить'}</button>` : ''}
           ${st !== 'active' && st !== 'complete' ? `<button class="btn sm" data-act="status" data-st="active" data-task="${t.id}" title="Если квест уже взят, но этого нет в логах">Уже взят</button>` : ''}
           ${st !== 'complete' ? `<button class="btn sm" data-act="status" data-st="complete" data-task="${t.id}">Выполнен</button>` : ''}
           ${st === 'locked' || st === 'available' ? `<button class="btn sm" data-act="chain" data-task="${t.id}">Предыдущие выполнены</button>` : ''}
@@ -707,6 +788,7 @@ function renderQuestDetail(t) {
         ${src ? `<div class="note">${src}</div>` : ''}
       </div></div>
     <div class="dt-sec"><div class="panel-title">Условия</div><div class="dt-obj">${t.objectives.map((o) => objRow(t, o, null)).join('')}</div></div>
+    ${hintsHtml(t)}
     <div class="dt-sec"><div class="panel-title">Фото места</div>${gallery}
       ${w?.guide ? `<div class="guide" style="margin-top:8px">${esc(w.guide)}</div>` : ''}
       ${w?.images?.length || w?.guide ? '<div class="attrib">Источник: Escape from Tarkov Wiki (escapefromtarkov.fandom.com), CC BY-SA</div>' : ''}</div>
@@ -742,14 +824,14 @@ function renderBase() {
     for (const r of l.stationLevelRequirements) { const ok = built(r.station) >= r.level; lines.push(`<div class="req ${isDone ? '' : ok ? 'ok' : 'no'}">${ok ? '✓' : '•'} ${esc(idx.station.get(r.station)?.name || '?')} — ур. ${r.level}</div>`); }
     for (const r of l.traderRequirements) lines.push(`<div class="req">• ${esc(trader(r.trader).name)} — ${r.requirementType === 'reputation' ? 'репутация' : 'уровень'} ${r.value}</div>`);
     for (const r of l.skillRequirements) lines.push(`<div class="req">• Умение ${esc(skillName(r.name))} — ${r.level}</div>`);
-    if (l.constructionTime) lines.push(`<div class="req">⏱ ${fmtTime(l.constructionTime)}</div>`);
+    if (l.constructionTime) lines.push(`<div class="req">Строится ${fmtTime(l.constructionTime)}</div>`);
     const items = l.itemRequirements.map((r) => {
       const it = item(r.item), h = owned(r.item), money = MONEY.has(r.item);
       return `<div class="ritem${!money && h >= r.count ? ' have' : ''}" title="${esc(it.n)}"><img src="${esc(it.i || '')}" alt="" loading="lazy"><div class="rn"><b>${esc(it.s || it.n)}</b>${money ? fmt(r.count) : `${h}/${r.count}`}${r.fir ? ' <span class="tag fir">FiR</span>' : ''}</div>
         ${money || isDone ? '' : `<div class="step"><button data-act="own" data-id="${r.item}" data-d="1">+</button><button data-act="own" data-id="${r.item}" data-d="-1">−</button></div>`}</div>`;
     }).join('');
     return `<div class="lvl${isDone ? ' done' : ''}${isNext ? ' next' : ''}"><div class="lvl-h"><b>Уровень ${l.level}</b><span>${isDone ? 'построен' : isNext ? 'следующий' : ''}</span>
-      ${isNext ? `<button class="btn sm accent" data-act="hlvl" data-station="${s.id}" data-lvl="${l.level}">✓ Построил</button>` : ''}</div>${lines.join('')}${isDone ? '' : `<div class="reqitems">${items}</div>`}</div>`;
+      ${isNext ? `<button class="btn sm accent" data-act="hlvl" data-station="${s.id}" data-lvl="${l.level}">Построил</button>` : ''}</div>${lines.join('')}${isDone ? '' : `<div class="reqitems">${items}</div>`}</div>`;
   }).join('');
   setHtml($('#baseDetail'), `<div class="dt-head"><img class="portrait" src="${esc(s.imageLink || '')}" alt="" style="object-fit:contain;padding:6px">
     <div class="dt-title"><h2>${esc(s.name)}</h2><div class="dt-meta">построено: ${lvl} из ${maxLevel(s)}</div></div></div><div class="lvls">${lv}</div>`);
@@ -816,10 +898,6 @@ $('#iHideDone').addEventListener('change', (e) => { ui.iHideDone = e.target.chec
 $('#iSearch').addEventListener('input', debounce((e) => { ui.iSearch = e.target.value; render(); }, 150));
 
 // ---------------------------------------------------------------- СВОДКА
-const ring = (pct, color = 'var(--accent)') => {
-  const c = 2 * Math.PI * 18, off = c * (1 - Math.max(0, Math.min(1, pct || 0)));
-  return `<svg class="ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="var(--line)" stroke-width="4"/><circle cx="22" cy="22" r="18" fill="none" stroke="${color}" stroke-width="4" stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 22 22)"/></svg>`;
-};
 function renderSummary() {
   const p = S.state.profile;
   const cnt = { active: 0, available: 0, complete: 0 };
@@ -831,14 +909,14 @@ function renderSummary() {
     if (t.lightkeeperRequired) { lA++; if (s === 'complete') lD++; }
   }
   const all = S.data.tasks.length;
-  const kpi = (r, v, label) => `<div class="kpi">${r}<div><b>${v}</b><span>${label}</span></div></div>`;
+  const kpi = (label, v, note, lead) => `<div class="kpi${lead ? ' lead' : ''}"><span>${label}</span><b>${v}</b><em>${note}</em></div>`;
+  const of = (d, n) => `${d}<small> / ${n}</small>`;
   setHtml($('#kpis'), [
-    kpi(ring((p.effectiveLevel || 1) / 79, 'var(--violet)'), p.effectiveLevel, p.manualLevel ? 'уровень (вручную)' : 'уровень (оценка)'),
-    kpi(ring(cnt.complete / all), `${cnt.complete}/${all}`, 'квестов выполнено'),
-    kpi(ring(cnt.active / Math.max(1, cnt.active + cnt.available)), cnt.active, 'активных сейчас'),
-    kpi(ring(cnt.available / all, 'var(--violet)'), cnt.available, 'можно взять'),
-    kpi(ring(kA ? kD / kA : 0, 'var(--amber)'), `${kD}/${kA}`, 'для Каппы'),
-    kpi(ring(lA ? lD / lA : 0, '#93C5FD'), `${lD}/${lA}`, 'для Смотрителя'),
+    kpi('Активных квестов', cnt.active, `ещё ${cnt.available} можно взять`, true),
+    kpi('Выполнено', of(cnt.complete, all), `${Math.round((cnt.complete / Math.max(1, all)) * 100)}% всех квестов`),
+    kpi('Уровень', p.effectiveLevel, p.manualLevel ? 'указан вручную' : 'оценка по квестам'),
+    kpi('Каппа', of(kD, kA), `осталось ${kA - kD}`),
+    lA ? kpi('Смотритель', of(lD, lA), `осталось ${lA - lD}`) : '',
   ].join(''));
   $('#pProfile').textContent = p.id === 'default' ? 'ещё не найден в логах' : '…' + p.id.slice(-8);
   $('#pMode').textContent = `${p.mode === 'pve' ? 'PvE' : p.mode ? 'PvP' : '—'} · ${p.faction ? p.faction.toUpperCase() : 'фракция не определена'}`;
@@ -1038,6 +1116,8 @@ api.onDebugSide((x) => {
   if (x === 'palette') openPalette();
   if (x === 'settings') openSettings();
   if (x === 'legend') $('#btnLegend').click();
+  if (x === 'qpop') setTimeout(() => { const l = [...tmap.questMarkers.values()][0]?.[0]; if (l) { tmap.map.setView(l.getLatLng(), tmap.map.getZoom() + 1, { animate: false }); l.openPopup(); } }, 1500);
+  if (x === 'story') { ui.qStatus = 'story'; ui.qSel = null; render(); }
   if (x === 'sbottom') { openSettings(); const sc = [...$('#settings').querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 20 && getComputedStyle(e).overflowY !== 'visible'); if (sc) sc.scrollTop = 1e5; }
   if (x === 'spawns') for (const k of ['spawnPmc', 'spawnScav']) { $(`#layerChips [data-layer="${k}"]`)?.classList.add('on'); tmap.setLayer(k, true); }
   if (x?.startsWith('go:')) { const mm = mapByLogId(x.slice(3)); if (mm) { ui.raidMap = mm.id; ui.follow = false; render(); } }
