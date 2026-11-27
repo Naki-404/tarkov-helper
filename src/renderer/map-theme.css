@@ -57,23 +57,26 @@
 /* зона, где засчитывается условие, — тонкий пунктир */
 path.qzone { pointer-events: none; }
 
-/* метка задания — бирка с номером (та же, что в списке задач), в углу — значок типа условия */
-.mq { position: relative; min-width: 24px; height: 20px; padding: 0 4px; border-radius: 4px; display: grid; place-items: center;
-  background: #10110F; border: 1.5px solid #E0A43C; box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
-  font: 600 12px var(--mono); color: #E0A43C; transition: transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease); }
-.mq b { line-height: 1; font-weight: 600; }
-.mq.tracked { background: #E0A43C; color: #1A1206; }
-.mq.done { border-color: #8BAF73; color: #8BAF73; opacity: .6; }
-.mq.avail { min-width: 14px; width: 14px; height: 14px; padding: 0; border: 1.5px dashed #A3A094; font-size: 0; background: rgba(16, 17, 15, .85); }
-.mq.item { min-width: 16px; width: 16px; height: 16px; padding: 0; transform: rotate(45deg); border-radius: 3px; font-size: 0; }
-.mq.item .mq-t { transform: rotate(-45deg); position: static; width: 10px; height: 10px; background: #E0A43C; border: 0; border-radius: 0; }
-.mq.item.tracked .mq-t { background: #1A1206; }
-.mq-t { position: absolute; right: -7px; top: -7px; width: 13px; height: 13px; border-radius: 3px; background: #E0A43C; border: 1.5px solid #10110F; }
-.mq.done .mq-t { background: #8BAF73; }
-.mq.avail .mq-t { display: none; }
-.mq-t::after { content: ""; position: absolute; inset: 1.5px; background: #10110F;
-  -webkit-mask: var(--g) center / contain no-repeat; mask: var(--g) center / contain no-repeat; }
-.mq.item .mq-t::after { inset: 0; }
+/* метка задания — янтарная булавка: остриё указывает место, внутри — что сделать, сбоку — номер квеста из списка задач */
+.mq { position: relative; width: 28px; height: 36px; transform-origin: 50% 100%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .65));
+  transition: transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease); }
+.mq-pin { position: absolute; inset: 0; width: 28px; height: 36px; overflow: visible; }
+.mq-pp { fill: #E0A43C; stroke: #10110F; stroke-width: 1.5px; }
+.mq-gp { fill: #1A1206; }
+.mq-n { position: absolute; left: 20px; top: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #10110F; border: 1.5px solid #E0A43C;
+  color: #E0A43C; font: 600 11px/15px var(--mono); text-align: center; }
+/* закреплённый: светлая обводка, номер на янтаре */
+.mq.tracked .mq-pp { stroke: #F4F1E6; stroke-width: 2px; }
+.mq.tracked .mq-n { background: #E0A43C; color: #1A1206; border-color: #F4F1E6; }
+/* выполнено: зелёная, приглушённая */
+.mq.done { opacity: .65; }
+.mq.done .mq-pp { fill: #8BAF73; }
+.mq.done .mq-gp { fill: #182212; }
+.mq.done .mq-n { color: #8BAF73; border-color: #8BAF73; }
+/* можно взять: пустая булавка с пунктиром, поменьше */
+.mq.avail { transform: scale(.8); }
+.mq.avail .mq-pp { fill: rgba(16, 17, 15, .88); stroke: #A3A094; stroke-dasharray: 3 2; }
+.mq.avail .mq-gp { fill: #A3A094; }
 .t-visit { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5Z'/%3E%3C/svg%3E"); }
 .t-mark { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14.4,6L14,4H5V21H7V14H12.6L13,16H20V6H14.4Z'/%3E%3C/svg%3E"); }
 .t-plantItem, .t-plantQuestItem { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z'/%3E%3C/svg%3E"); }
@@ -82,7 +85,7 @@ path.qzone { pointer-events: none; }
 .t-useItem, .t-extract, .t-experience, .t-buildWeapon { --g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,7V13H13V7H11M11,15V17H13V15H11Z'/%3E%3C/svg%3E"); }
 #map.hovering .mq:not(.hl) { opacity: .3; }
 .mq.hl, .mq.focus { transform: scale(1.25); }
-.mq.item.hl, .mq.item.focus { transform: rotate(45deg) scale(1.25); }
+.mq.avail.hl, .mq.avail.focus { transform: scale(1); }
 
 /* выходы: квадрат цвета фракции и подпись рядом, как на бумажной карте */
 .mk-x { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; border: 1.5px solid var(--fc); background: rgba(16, 17, 15, .94);

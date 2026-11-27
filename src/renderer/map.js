@@ -4,6 +4,23 @@
 /* global L */
 
 const SVGNS = 'http://www.w3.org/2000/svg';
+// значки действия внутри булавки (24×24)
+const GLYPH = {
+  "visit":"M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5Z",
+  "mark":"M14.4,6L14,4H5V21H7V14H12.6L13,16H20V6H14.4Z",
+  "plantItem":"M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z",
+  "findQuestItem":"M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3Z",
+  "shoot":"M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13Z",
+  "useItem":"M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,7V13H13V7H11M11,15V17H13V15H11Z",
+};
+const GLYPH_ALIAS = {"plantQuestItem":"plantItem","findItem":"findQuestItem","giveQuestItem":"findQuestItem","giveItem":"findQuestItem","extract":"useItem","experience":"useItem","buildWeapon":"useItem"};
+const glyphOf = (type) => GLYPH[type] || GLYPH[GLYPH_ALIAS[type]] || GLYPH.visit;
+export const glyphIcon = (type) => `<svg viewBox="0 0 24 24"><path d="${glyphOf(type)}"/></svg>`;
+// метка условия квеста: янтарная булавка со значком действия внутри и номером квеста (как в списке задач) сбоку.
+// Значок нарисован в самом SVG: маски CSS на маркерах при программной отрисовке пропадают
+export const questPin = (state, n, type) => `<div class="mq ${state}"><svg class="mq-pin" viewBox="0 0 28 36"><path class="mq-pp" d="M14 1.5C7.1 1.5 1.5 7 1.5 13.8c0 8.9 10.9 19.6 11.8 20.5a1 1 0 0 0 1.4 0c.9-.9 11.8-11.6 11.8-20.5C26.5 7 20.9 1.5 14 1.5Z"/>`
+  + `<path class="mq-gp" transform="translate(6.5 6) scale(.625)" d="${glyphOf(type)}"/></svg>${n != null && state !== 'avail' ? `<b class="mq-n">${esc(n)}</b>` : ''}</div>`;
+
 export const ICON = {
   lock: '<svg viewBox="0 0 24 24"><path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>',
   exit: '<svg viewBox="0 0 24 24"><path d="M13.34,8.17C12.41,8.17 11.65,7.4 11.65,6.47A1.69,1.69 0 0,1 13.34,4.78C14.28,4.78 15.04,5.54 15.04,6.47C15.04,7.4 14.28,8.17 13.34,8.17M10.3,19.93L4.37,18.75L4.71,17.05L8.86,17.9L10.21,11.04L8.69,11.64V14.5H7V10.54L11.4,8.67L12.07,8.59C12.67,8.59 13.17,8.93 13.5,9.44L14.36,10.79C15.04,12 16.39,12.82 18,12.82V14.5C16.14,14.5 14.44,13.67 13.34,12.4L12.84,14.94L14.61,16.63V23H12.92V17.9L11.14,16.21L10.3,19.93M21,23H19V3H6V16.82L4,16.4V1H21V23M6,23H4V19.85L6,20.27V23Z"/></svg>',
@@ -635,10 +652,8 @@ export class TarkovMap {
         grp.addLayer(L.polygon(p.outline.map(pos), { className: 'qzone', color: p.avail ? '#A3A094' : p.done ? '#8BAF73' : '#E0A43C', weight: 1, opacity: 0.75, dashArray: '4 4', fillOpacity: 0.05, interactive: false, height: h }));
       }
       const state = p.avail ? 'avail' : p.done ? 'done' : p.tracked ? 'tracked' : 'active';
-      const isItem = p.kind === 'item';
-      const sz = isItem ? 18 : 24;
-      const icon = L.divIcon({ className: 'mk', iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2], popupAnchor: [0, -12],
-        html: `<div class="mq ${state}${isItem ? ' item' : ''}"><b>${esc(p.n ?? '')}</b><i class="mq-t t-${esc(p.type || 'visit')}"></i></div>` });
+      // булавка: остриё — точно в месте условия
+      const icon = L.divIcon({ className: 'mk', iconSize: [28, 36], iconAnchor: [14, 35], popupAnchor: [0, -32], tooltipAnchor: [8, -18], html: questPin(state, p.n, p.type) });
       const mk = L.marker(pos(p.position), { icon, height: h, riseOnHover: true, zIndexOffset: p.tracked ? 500 : 0 });
       mk.bindTooltip(() => this.questTooltip(p), { className: 'tt tt-q', direction: 'auto', offset: [14, 0], opacity: 1 });
       mk.bindPopup(() => this.questCard?.(p) || `<div class="pop-title">${esc(p.title)}</div><div class="pop-sub">${esc(p.sub)}</div><div>${esc(p.text)}</div>

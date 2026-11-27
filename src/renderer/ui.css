@@ -281,8 +281,8 @@ body.no-right .hud-layers { right: 44px; }
 .task.avail { background: transparent; border-style: dashed; }
 .task-h { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; cursor: pointer; }
 /* бирка с номером — та же, что на карте */
-.tnum { min-width: 24px; height: 20px; padding: 0 4px; flex: none; display: grid; place-items: center; font: 600 12px var(--mono); color: var(--accent);
-  background: #0E0F0D; border: 1.5px solid var(--accent); border-radius: var(--r-xs); }
+.tnum { min-width: 22px; height: 22px; padding: 0 5px; flex: none; display: grid; place-items: center; font: 600 12px var(--mono); color: var(--accent); /* как номер на булавке карты */
+  background: #0E0F0D; border: 1.5px solid var(--accent); border-radius: 11px; }
 .task.tracked .tnum { background: var(--accent); color: var(--accent-ink); }
 .tnum.none { border-color: var(--line2); color: var(--faint); }
 .task.avail .tnum { border-style: dashed; border-color: var(--faint); color: var(--dim); }
@@ -694,3 +694,7 @@ a.map-credit:hover, a.map-credit:hover b { color: var(--text); }
 @media (max-width: 860px) { .telemetry .tl-main { display: none; } .telemetry { min-width: 0; padding: 0 8px; } .tools .sep, #btnHelp { display: none; } .tool { width: 32px; } .win { width: 40px; } }
 @media (max-width: 700px) { #btnPin, #btnSettings { display: none; } .omni { display: none; } .bar { gap: 8px; padding-left: 8px; } }
 .tl-main::first-letter { text-transform: uppercase; }
+.map-legend .lgr .mq { transform: scale(.8); }
+.map-legend .lg-glyphs { display: flex; gap: 4px; }
+.map-legend .lg-glyphs svg { width: 14px; height: 14px; fill: var(--accent); }
+.map-legend .lgr:has(.lg-glyphs) i.box { width: 72px; }

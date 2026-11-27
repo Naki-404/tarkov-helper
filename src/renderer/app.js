@@ -1,4 +1,4 @@
-import { TarkovMap, ICON } from './map.js';
+import { TarkovMap, ICON, questPin, glyphIcon } from './map.js';
 import {
   S, idx, idOf, MONEY, ST_LABEL, RAID_LABEL, indexData, item, trader, statusOf, statusInfo, isTracked, objCount, objProgress, objDone, taskPct,
   mapByLogId, defFor, selectableMaps, sameMapIds, taskOnMap, objOnMap, objHere, mapNames, hasMapPoints, byTrader, objText, objItems, prereqChain,
@@ -557,11 +557,11 @@ new ResizeObserver(([e]) => document.documentElement.style.setProperty('--hud-h'
 const legendHtml = () => {
   const row = (icon, text) => `<div class="lgr"><i class="box">${icon}</i><span>${text}</span></div>`;
   return `<h4>Значки на карте</h4><div class="lg-grid">
-    ${row('<div class="mq"><b>3</b><i class="mq-t t-visit"></i></div>', 'Условие активного квеста: номер — как в списке задач, значок в углу — тип условия')}
-    ${row('<div class="mq tracked"><b>1</b><i class="mq-t t-findQuestItem"></i></div>', 'Закреплённый квест')}
-    ${row('<div class="mq done"><b>2</b></div>', 'Условие выполнено')}
-    ${row('<div class="mq avail"></div>', 'Квест можно взять — его точка на этой карте')}
-    ${row('<div class="mq item"><i class="mq-t"></i></div>', 'Предмет или место закладки')}
+    ${row(questPin('active', 3, 'visit'), 'Метка задания: остриё — место, внутри — что сделать, цифра — номер квеста в списке задач')}
+    ${row(questPin('tracked', 1, 'findQuestItem'), 'Закреплённый квест — светлая обводка и номер на янтаре')}
+    ${row(questPin('done', 2, 'plantItem'), 'Условие выполнено')}
+    ${row(questPin('avail', null, 'mark'), 'Квест можно взять — его точка на этой карте')}
+    ${row(`<span class="lg-glyphs">${['findQuestItem', 'plantItem', 'mark', 'shoot'].map(glyphIcon).join('')}</span>`, 'Значки: найти · заложить · отметить маркером · убить')}
     ${row('<span class="lg-zone"></span>', 'Зона, где засчитывается условие')}
     ${row(`<div class="mk-x pmc">${ICON.exit}</div>`, 'Выход ЧВК')}
     ${row(`<div class="mk-x scav">${ICON.exit}</div>`, 'Выход Диких')}
